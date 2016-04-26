@@ -46,6 +46,14 @@
 #define  DISP_KB_PRIO                     		41
 #define  DISP_CHG_PWD_PRIO                     	42
 
+//////////////////////////////////////////////////////////////////////////////
+//								STRUCTURES									//
+//////////////////////////////////////////////////////////////////////////////
+
+struct CANMsg {
+	INT8U id;
+	INT8U msg;
+};
 
 //////////////////////////////////////////////////////////////////////////////
 //									CONSTANTES								//
@@ -106,7 +114,7 @@ OS_EVENT *CANMsgOutMB;
 
 // Queues
 OS_EVENT *allCANMsgInQueue;
-void *allCANMsgInArray[20];
+CANMsg *allCANMsgInArray[20];
 
 
 //////////////////////////////////////////////////////////////////////////////
@@ -138,6 +146,13 @@ extern  void  AppProbeInit(void);
 #define INTRUSION_STATE	3
 #define ALARM_STATE		4
 #define PWD_CHG_STATE	5
+
+#define HEARTBEAT_MSG	0
+#define INTRUSION_MSG	1
+#define ARMED_MSG		2
+#define DISARMED_MSG	3
+#define ALARM_MSG		4
+#define PWD_CHG_MSG		5
 
 
 //////////////////////////////////////////////////////////////////////////////
@@ -411,25 +426,75 @@ static  void  HeartbeatCheckTask(void *p_arg)
 
 //	Initialisations
 ///////////////////
-static INT8U idListBuf[100];
-static INT8U HBMissmatchBuf[1];
-id = (INT8U*)OSMboxPend(idMB, 0, &err);
+	INT16U nodesTTL[256] = {0};
+	INT8U fixedIdList[256];
+	static CANMsg msgInQueue[20];
+	INT32U endTime=OSTimeGet();
+	INT32U time;
+	int i, j, sizeFixedList, size;
+	static INT8U HBMissmatchBuf;
+
+	
+	id = (INT8U*)OSMboxPend(idMB, 0, &err);
 
 //	Infinite loop
 /////////////////
     while (42)
 	{
-		state = (INT8U*)OSMboxAccept(stateMB);
+		id
+		msgInQueue = {null};
+		msgInQueue = (CANMsg*)OSQPend(allCANMsgInQueue, 100, &err);
+		time = (2e32-1)-abs(OSTimeGet()-endTime);
+		for (i=0; i<256; i++)
+		{
+			nodesTTL[i]-=time;
+			if (nodesTTL[i] <= 0)
+			{
+				nodesTTL[i]=0;
+			}
+		}
+		endTime=OSTimeGet();
+		j=0;
+		while (msgInQueue[j] != null)
+		{
+			nodesTTL[msgInQueue[j].id]=5000;
+			j++;
+		}
 		if (state[0] == INIT_STATE || state[0] == DISARMED_STATE || state[0] == PWD_CHG_STATE)
 		{
-			// Update ID list
-			err = OSMboxPost(idListMB, (void *)&idListBuf[0]);
+			id = (INT8U*)OSMboxAccept(idMB);  // for when takeID changes id when already taken
+			// update fixed list
+			fixedIdList = {null};
+			for (i=0; i<256; i++)
+			{
+				int sizeFixedList=0;
+				if (nodesTTL[i] > 0)
+				{
+					fixedIdList[sizeFixedList]=i;
+					sizeFixedList++;
+				}
+			}
 		}
 		else
 		{
-			// Check for ID missmatch
-			err = OSSemPost(HBMissmatchSM);
+			// compare with fixed list
+			for (i=0; i<256; i++)
+			{
+				size=0;
+				if (nodesTTL[i] > 0)
+				{
+					if (size > sizeFixedList || fixedIdList[size] != i || nodesTTL[i] == id)
+					{
+						err = OSSemPost(HBMissmatchSM);
+					}
+					size++;
+				}
+				
+			}
 		}
+		err = OSMboxPost(idListMB, (void *)&fixedIdList[0]);
+		err = OSQFlush(allCANMsgInQueue);
+		OSTimeDly(50);
    	} 	
 }
 
@@ -440,26 +505,24 @@ static  void  HeartbeatTask(void *p_arg)
 
    (void)p_arg;	// to avoid a warning message
 
+	INT8U *id;
+	INT32U timeStart;
+	CANMsg heartbeat;
 
 //	Initialisations
 ///////////////////
-	
-	OSSemPend(CANInitSem, 0, &err);
-	DispInit(2, 16);
-	DispClrScr();
+	id = (INT8U*)OSMboxPend(idMB, 0, &err);
+	heartbeat.id = id;
+	heartbeat.msg = HEARTBEAT_MSG;
 
 //	Infinite loop
 /////////////////
     while (1)
 	{
-		OSSemPend(CANReceiveSem, 0, &err);
-	//	DispLock();
-		DispStr(0, 0, mess[0]);
-		DispStr(0, 8, mess[1]);
-		DispStr(1, 0, mess[2]);
-		DispStr(1, 8, mess[3]);
-	//	DispUnlock();
-	OSTimeDly(100);
+		timeStart = OSTimeGet();
+		id = (INT8U*)OSMboxAccept(idMB);
+		err = OSMboxPost(heartbeatMB, (void *)&heartbeat);
+		OSTimeDly(HEARTBEAT_PERIOD-((2e32-1)-abs(OSTimeGet()-timeStart)));
    	} 	
 }
 
@@ -467,29 +530,37 @@ static  void  TakeIdTask(void *p_arg)
 {
 	INT8U err;
 
+	INT8U *id;
+	INT8U idList[256];
+	int i;
 
    (void)p_arg;	// to avoid a warning message
 
 
 //	Initialisations
 ///////////////////
+	id = rand()*256;
 	
-	OSSemPend(CANInitSem, 0, &err);
-	DispInit(2, 16);
-	DispClrScr();
+	do {
+		err = OSMboxPost(idMB, (void *)&id);
+		idList = (INT8U*)OSMboxPend(idListMB, 0, &err);
+		i=0;
+		while (idList[i] != null)
+		{
+			if (idList[i] == id)
+			{
+				id = rand()*256;
+				i=-1;
+			}
+			i++;
+		}
+	}while (idList == (INT8U*)OSMboxPend(idListMB, 0, &err));
 
 //	Infinite loop
 /////////////////
     while (1)
 	{
-		OSSemPend(CANReceiveSem, 0, &err);
-	//	DispLock();
-		DispStr(0, 0, mess[0]);
-		DispStr(0, 8, mess[1]);
-		DispStr(1, 0, mess[2]);
-		DispStr(1, 8, mess[3]);
-	//	DispUnlock();
-	OSTimeDly(100);
+		
    	} 	
 }
 
