@@ -1,25 +1,4 @@
 //////////////////////////////////////////////////////////////////////////////
-//																			//
-//					uC/OSII example for ELEC-H-410 labs						//
-//																			//
-//	This application creates 3 tasks :										//
-//		- AppStartTask :													//
-//			it creates the other tasks and flashes LED1 at 1Hz				//
-//		- AppKeyboardTask :													//
-//			it scans the keyboard ; when a key is pressed, the task writes	//
-//			the key value on LED8-5	and sends the corresponding ASCII		//
-//			character to AppLCDTask (using a mailbox)						//
-//		- AppLCDTask : 														//
-//			it displays the characters send by AppKeyboardTask on the LCD	//
-//																			//
-//	As AppStartTask and AppKeyboardTask shares the LEDs, we must use a		//
-//	semaphore.																//
-//																			//
-//////////////////////////////////////////////////////////////////////////////
-
-
-
-//////////////////////////////////////////////////////////////////////////////
 //									INCLUDES								//
 //////////////////////////////////////////////////////////////////////////////
 #include <includes.h>	// uC/OSII includes
@@ -114,7 +93,7 @@ OS_EVENT *CANMsgOutMB;
 
 // Queues
 OS_EVENT *allCANMsgInQueue;
-CANMsg *allCANMsgInArray[20];
+CANMsg *allCANMsgInArray[30];
 
 
 //////////////////////////////////////////////////////////////////////////////
@@ -575,22 +554,13 @@ static  void  StateMachineTask(void *p_arg)
 //	Initialisations
 ///////////////////
 	
-	OSSemPend(CANInitSem, 0, &err);
-	DispInit(2, 16);
-	DispClrScr();
+	
 
 //	Infinite loop
 /////////////////
     while (1)
 	{
-		OSSemPend(CANReceiveSem, 0, &err);
-	//	DispLock();
-		DispStr(0, 0, mess[0]);
-		DispStr(0, 8, mess[1]);
-		DispStr(1, 0, mess[2]);
-		DispStr(1, 8, mess[3]);
-	//	DispUnlock();
-	OSTimeDly(100);
+		
    	} 	
 }
 
@@ -605,22 +575,14 @@ static  void  AlarmTask(void *p_arg)
 //	Initialisations
 ///////////////////
 	
-	OSSemPend(CANInitSem, 0, &err);
-	DispInit(2, 16);
-	DispClrScr();
 
 //	Infinite loop
 /////////////////
     while (1)
 	{
-		OSSemPend(CANReceiveSem, 0, &err);
-	//	DispLock();
-		DispStr(0, 0, mess[0]);
-		DispStr(0, 8, mess[1]);
-		DispStr(1, 0, mess[2]);
-		DispStr(1, 8, mess[3]);
-	//	DispUnlock();
-	OSTimeDly(100);
+                OSSemPend(AlarmSM, 0, &err);
+                // launch the alarm code
+		
    	} 	
 }
 
@@ -636,22 +598,13 @@ static  void  SendTask(void *p_arg)
 //	Initialisations
 ///////////////////
 	
-	OSSemPend(CANInitSem, 0, &err);
-	DispInit(2, 16);
-	DispClrScr();
+
 
 //	Infinite loop
 /////////////////
     while (1)
 	{
-		OSSemPend(CANReceiveSem, 0, &err);
-	//	DispLock();
-		DispStr(0, 0, mess[0]);
-		DispStr(0, 8, mess[1]);
-		DispStr(1, 0, mess[2]);
-		DispStr(1, 8, mess[3]);
-	//	DispUnlock();
-	OSTimeDly(100);
+
    	} 	
 }
 
@@ -666,23 +619,17 @@ static  void  ReadKbTask(void *p_arg)
 
 //	Initialisations
 ///////////////////
-	
-	OSSemPend(CANInitSem, 0, &err);
-	DispInit(2, 16);
-	DispClrScr();
+        INT32U timeStart;
+
 
 //	Infinite loop
 /////////////////
     while (1)
 	{
-		OSSemPend(CANReceiveSem, 0, &err);
-	//	DispLock();
-		DispStr(0, 0, mess[0]);
-		DispStr(0, 8, mess[1]);
-		DispStr(1, 0, mess[2]);
-		DispStr(1, 8, mess[3]);
-	//	DispUnlock();
-	OSTimeDly(100);
+            timeStart = OSTimeGet();
+
+
+            OSTimeDly(READ_KB_PERIOD-((2e32-1)-abs(OSTimeGet()-timeStart)));
    	} 	
 }
 
@@ -697,22 +644,12 @@ static  void  PwdCheckTask(void *p_arg)
 //	Initialisations
 ///////////////////
 	
-	OSSemPend(CANInitSem, 0, &err);
-	DispInit(2, 16);
-	DispClrScr();
 
 //	Infinite loop
 /////////////////
     while (1)
 	{
-		OSSemPend(CANReceiveSem, 0, &err);
-	//	DispLock();
-		DispStr(0, 0, mess[0]);
-		DispStr(0, 8, mess[1]);
-		DispStr(1, 0, mess[2]);
-		DispStr(1, 8, mess[3]);
-	//	DispUnlock();
-	OSTimeDly(100);
+
    	} 	
 }
 
@@ -727,7 +664,6 @@ static  void  DispStatetTask(void *p_arg)
 //	Initialisations
 ///////////////////
 	
-	OSSemPend(CANInitSem, 0, &err);
 	DispInit(2, 16);
 	DispClrScr();
 
@@ -735,14 +671,9 @@ static  void  DispStatetTask(void *p_arg)
 /////////////////
     while (1)
 	{
-		OSSemPend(CANReceiveSem, 0, &err);
-	//	DispLock();
-		DispStr(0, 0, mess[0]);
-		DispStr(0, 8, mess[1]);
-		DispStr(1, 0, mess[2]);
-		DispStr(1, 8, mess[3]);
-	//	DispUnlock();
-	OSTimeDly(100);
+                msg = (INT8U*)OSMboxPend(stateMB, 0, &err);
+                DispClrScr();
+                DispStr(0, 0, msg);
    	} 	
 }
 
@@ -787,21 +718,12 @@ static  void  DispChgPwdTask(void *p_arg)
 //	Initialisations
 ///////////////////
 	
-	OSSemPend(CANInitSem, 0, &err);
-	DispInit(2, 16);
-	DispClrScr();
+
 
 //	Infinite loop
 /////////////////
     while (1)
 	{
-		OSSemPend(CANReceiveSem, 0, &err);
-	//	DispLock();
-		DispStr(0, 0, mess[0]);
-		DispStr(0, 8, mess[1]);
-		DispStr(1, 0, mess[2]);
-		DispStr(1, 8, mess[3]);
-	//	DispUnlock();
-	OSTimeDly(100);
+
    	} 	
 }
