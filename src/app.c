@@ -108,7 +108,7 @@ static  void  AlarmTask(void *p_arg);
 static  void  SendTask(void *p_arg);
 static  void  ReadKbTask(void *p_arg);
 static  void  PwdCheckTask(void *p_arg);
-static  void  DispStatetTask(void *p_arg);
+static  void  DispStateTask(void *p_arg);
 static  void  DispKbTask(void *p_arg);
 static  void  DispChgPwdTask(void *p_arg);
 
@@ -194,13 +194,6 @@ CPU_INT16S  main (void)
 
 //////////////////////////////////////////////////////////////////////////////
 //								AppStartTask								//
-// Arguments :	p_arg passed to 'AppStartTask()' by 'OSTaskCreate()'.		//
-//				Not used in this task										//
-//	Notes :																	//
-//		1)	The first line of code is used to prevent a compiler warning	//
-//			because 'p_arg' is not used.									//
-//		2)	Interrupts are enabled once the task start because the I-bit	//
-//			of the CCR register was set to 0 by 'OSTaskCreate()'.			//
 //////////////////////////////////////////////////////////////////////////////
 static  void  AppStartTask (void *p_arg)
 {
@@ -574,7 +567,7 @@ static  void  AlarmTask(void *p_arg)
 
 //	Initialisations
 ///////////////////
-	
+
 
 //	Infinite loop
 /////////////////
@@ -597,7 +590,26 @@ static  void  SendTask(void *p_arg)
 
 //	Initialisations
 ///////////////////
-	
+        CanInitialisation(CAN_OP_MODE_NORMAL , CAN_BAUDRATE_500k);
+        transmitBuffer.SID = 0x189;
+        transmitBuffer.DLC = 6;
+        transmitBuffer.DATA[0] = 'F';
+        transmitBuffer.DATA[1] = 'N';
+        transmitBuffer.DATA[2] = 'J';
+        transmitBuffer.DATA[3] = 'V';
+        transmitBuffer.DATA[4] = 'V';
+        transmitBuffer.DATA[5] = 'D';
+
+        CanLoadFilter(0, 0x2A);
+        CanLoadFilter(1, 0x2B);
+        CanLoadFilter(2, 0x2C);
+        CanLoadFilter(3, 0x42);
+        CanLoadMask(0, 0x7FF);
+        CanAssociateMaskFilter(0, 0);
+        CanAssociateMaskFilter(0, 1);
+        CanAssociateMaskFilter(0, 2);
+        CanAssociateMaskFilter(0, 3);
+        ACTIVATE_CAN_INTERRUPTS = 1;
 
 
 //	Infinite loop
@@ -653,7 +665,7 @@ static  void  PwdCheckTask(void *p_arg)
    	} 	
 }
 
-static  void  DispStatetTask(void *p_arg)
+static  void  DispStateTask(void *p_arg)
 {
 	INT8U err;
 
@@ -687,23 +699,16 @@ static  void  DispKbTask(void *p_arg)
 
 //	Initialisations
 ///////////////////
+        // Done in DispStateTask()
 	
-	OSSemPend(CANInitSem, 0, &err);
-	DispInit(2, 16);
-	DispClrScr();
 
 //	Infinite loop
 /////////////////
     while (1)
 	{
-		OSSemPend(CANReceiveSem, 0, &err);
-	//	DispLock();
-		DispStr(0, 0, mess[0]);
-		DispStr(0, 8, mess[1]);
-		DispStr(1, 0, mess[2]);
-		DispStr(1, 8, mess[3]);
-	//	DispUnlock();
-	OSTimeDly(100);
+                msg = (INT8U*)OSMboxPend(validationResultMB, 0, &err);
+                DispClrScr();
+                DispStr(0, 0, msg);
    	} 	
 }
 
