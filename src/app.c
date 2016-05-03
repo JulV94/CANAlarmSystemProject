@@ -5,40 +5,21 @@
 #include "Keyboard.h"	// Keyboard functions library
 #include "CanDspic.h"
 
-
-/*
-*********************************************************************************************************
-*                                       TASK PRIORITIES
-*********************************************************************************************************
-*/
-
-#define  APP_TASK_START_PRIO                    9
-#define  HEARTBEAT_CHECK_PRIO                   11 
-#define  HEARTBEAT_PRIO							12
-#define  TAKE_ID_PRIO							13
-#define  STATE_MACHINE_PRIO                     15
-#define  ALARM_PRIO                   			20
-#define  SEND_PRIO                     			25
-#define  READ_KB_PRIO                     		28
-#define  PWD_CHECK_PRIO                     	30
-#define  DISP_STATE_PRIO                     	40
-#define  DISP_KB_PRIO                     		41
-#define  DISP_CHG_PWD_PRIO                     	42
-
-//////////////////////////////////////////////////////////////////////////////
-//								STRUCTURES									//
-//////////////////////////////////////////////////////////////////////////////
-
-struct CANMsg {
-	INT8U id;
-	INT8U msg;
-};
-
 //////////////////////////////////////////////////////////////////////////////
 //									CONSTANTES								//
 //////////////////////////////////////////////////////////////////////////////
 const INT8U hex2ASCII[16] = {	'0', '1', '2', '3', '4', '5', '6', '7',
 								'8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
+
+
+//////////////////////////////////////////////////////////////////////////////
+//								STRUCTURES									//
+//////////////////////////////////////////////////////////////////////////////
+
+typedef struct {
+	INT8U id;
+	INT8U msg;
+}CANMsg;
 
 //////////////////////////////////////////////////////////////////////////////
 //									VARIABLES								//
@@ -46,8 +27,10 @@ const INT8U hex2ASCII[16] = {	'0', '1', '2', '3', '4', '5', '6', '7',
 // Tasks stack
 #define  APP_TASK_START_STK_SIZE			128
 OS_STK  AppStartTaskStk[APP_TASK_START_STK_SIZE];
-#define  HEARTBEAT_CHECK_TASK_STK_SIZE		128
+
+#define  HEARTBEAT_CHECK_TASK_STK_SIZE		1024
 OS_STK	HeartbeatCheckTaskStk[HEARTBEAT_CHECK_TASK_STK_SIZE];
+
 #define  HEARTBEAT_TASK_STK_SIZE			128
 OS_STK	HeartbeatTaskStk[HEARTBEAT_TASK_STK_SIZE];
 #define  TAKE_ID_TASK_STK_SIZE				128
@@ -68,11 +51,6 @@ OS_STK	DispStateTaskStk[DISP_STATE_TASK_STK_SIZE];
 OS_STK	DispKbTaskStk[DISP_KB_TASK_STK_SIZE];
 #define  DISP_CHG_PWD_TASK_STK_SIZE			128
 OS_STK	DispChgPwdTaskStk[DISP_CHG_PWD_TASK_STK_SIZE];
-
-
-// Periods
-#define HEARTBEAT_PERIOD				4000
-#define READ_KB_PERIOD					100
 
 // Semaphores
 OS_EVENT *alarmSM;
@@ -117,25 +95,6 @@ extern  void  AppProbeInit(void);
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
-//						  		PROTOCOLS									//
-//////////////////////////////////////////////////////////////////////////////
-#define INIT_STATE		0
-#define DISARMED_STATE	1
-#define PWD_CHG_STATE	2
-#define ARMED_STATE		3
-#define INTRUSION_STATE	4
-#define ALARM_STATE		5
-
-
-#define HEARTBEAT_MSG	0
-#define INTRUSION_MSG	1
-#define ARMED_MSG		2
-#define DISARMED_MSG	3
-#define ALARM_MSG		4
-#define PWD_CHG_MSG		5
-
-
-//////////////////////////////////////////////////////////////////////////////
 //							MAIN FUNCTION									//
 //////////////////////////////////////////////////////////////////////////////
 CPU_INT16S  main (void)
@@ -144,7 +103,7 @@ CPU_INT16S  main (void)
 
 
 	BSP_IntDisAll();	// Disable all interrupts until we are ready to accept them
-
+	init_elec_h_410();
 	OSInit();			// Initialize "uC/OS-II, The Real-Time Kernel"
 
 	// create semaphores
@@ -165,7 +124,7 @@ CPU_INT16S  main (void)
 	CANMsgOutMB = OSMboxCreate((void *)0);
 
 	// create queues
-	allCANMsgInQueue = OSQCreate(&allCANMsgInArray[0], 20);
+	allCANMsgInQueue = OSQCreate((void*)&allCANMsgInArray[0], 20);
 
 	OSTaskCreateExt(
 			AppStartTask,		// creates AppStartTask
@@ -351,7 +310,7 @@ OSTaskCreateExt(
 
 
 OSTaskCreateExt(
-			DispStatetTask,
+			DispStateTask,
 			(void *)0,
 			(OS_STK *)&DispStateTaskStk[0],
 			DISP_STATE_PRIO,
@@ -378,8 +337,6 @@ OSTaskCreateExt(
 	// defines the App Name (for debug purpose)
     OSTaskNameSet(DISP_KB_PRIO, (CPU_INT08U *)"Disp Kb Task", &err);	
 
-
-
 //	Infinite loop
 /////////////////
     while (42)
@@ -400,13 +357,14 @@ static  void  HeartbeatCheckTask(void *p_arg)
 //	Initialisations
 ///////////////////
 	INT16U nodesTTL[256] = {0};
-	INT8U fixedIdList[256];
-	static CANMsg msgInQueue[20];
+	int fixedIdList[256];
+	CANMsg *msgInQueue;
 	INT32U endTime=OSTimeGet();
 	INT32U time;
 	int i, j, sizeFixedList, size;
 	static INT8U HBMissmatchBuf;
 
+	TASK_ENABLE1=1;
 	
 	id = (INT8U*)OSMboxPend(idMB, 0, &err);
 
@@ -414,9 +372,7 @@ static  void  HeartbeatCheckTask(void *p_arg)
 /////////////////
     while (42)
 	{
-		id
-		msgInQueue = {null};
-		msgInQueue = (CANMsg*)OSQPend(allCANMsgInQueue, 100, &err);
+	/*	id = (INT8U*)OSMboxAccept(idMB);
 		time = (2e32-1)-abs(OSTimeGet()-endTime);
 		for (i=0; i<256; i++)
 		{
@@ -428,7 +384,7 @@ static  void  HeartbeatCheckTask(void *p_arg)
 		}
 		endTime=OSTimeGet();
 		j=0;
-		while (msgInQueue[j] != null)
+		while (msgInQueue = (CANMsg*)OSQPend(allCANMsgInQueue, 100, &err))
 		{
 			nodesTTL[msgInQueue[j].id]=5000;
 			j++;
@@ -437,7 +393,7 @@ static  void  HeartbeatCheckTask(void *p_arg)
 		{
 			id = (INT8U*)OSMboxAccept(idMB);  // for when takeID changes id when already taken
 			// update fixed list
-			fixedIdList = {null};
+			Mem_Set((void*)&fixedIdList[0], -1, sizeof(int)*256);
 			for (i=0; i<256; i++)
 			{
 				int sizeFixedList=0;
@@ -456,7 +412,7 @@ static  void  HeartbeatCheckTask(void *p_arg)
 				size=0;
 				if (nodesTTL[i] > 0)
 				{
-					if (size > sizeFixedList || fixedIdList[size] != i || nodesTTL[i] == id)
+					if (size > sizeFixedList || fixedIdList[size] != i || nodesTTL[i] == *id)
 					{
 						err = OSSemPost(HBMissmatchSM);
 					}
@@ -466,9 +422,10 @@ static  void  HeartbeatCheckTask(void *p_arg)
 			}
 		}
 		err = OSMboxPost(idListMB, (void *)&fixedIdList[0]);
-		err = OSQFlush(allCANMsgInQueue);
+		//err = OSQFlush(allCANMsgInQueue);*/
+		TASK_ENABLE1^=1;
 		OSTimeDly(50);
-   	} 	
+   	}
 }
 
 static  void  HeartbeatTask(void *p_arg)
@@ -481,21 +438,22 @@ static  void  HeartbeatTask(void *p_arg)
 	INT8U *id;
 	INT32U timeStart;
 	CANMsg heartbeat;
-
+	TASK_ENABLE2=1;
 //	Initialisations
 ///////////////////
-	id = (INT8U*)OSMboxPend(idMB, 0, &err);
-	heartbeat.id = id;
+/*	id = (INT8U*)OSMboxPend(idMB, 0, &err);
+	heartbeat.id = *id;
 	heartbeat.msg = HEARTBEAT_MSG;
-
+*/
 //	Infinite loop
 /////////////////
     while (1)
 	{
-		timeStart = OSTimeGet();
-		id = (INT8U*)OSMboxAccept(idMB);
-		err = OSMboxPost(heartbeatMB, (void *)&heartbeat);
-		OSTimeDly(HEARTBEAT_PERIOD-((2e32-1)-abs(OSTimeGet()-timeStart)));
+//		timeStart = OSTimeGet();
+	//	id = (INT8U*)OSMboxAccept(idMB);
+	//	err = OSMboxPost(heartbeatMB, (void *)&heartbeat);
+		TASK_ENABLE2^=1;
+		OSTimeDly(100);//-((2-1)-abs(OSTimeGet()-timeStart)));
    	} 	
 }
 
@@ -504,7 +462,7 @@ static  void  TakeIdTask(void *p_arg)
 	INT8U err;
 
 	INT8U *id;
-	INT8U idList[256];
+	int *idList;
 	int i;
 
    (void)p_arg;	// to avoid a warning message
@@ -512,42 +470,42 @@ static  void  TakeIdTask(void *p_arg)
 
 //	Initialisations
 ///////////////////
-	id = rand()*256;
+	*id = rand()*256;
 	
 	do {
 		err = OSMboxPost(idMB, (void *)&id);
-		idList = (INT8U*)OSMboxPend(idListMB, 0, &err);
+		idList = (int*)OSMboxPend(idListMB, 0, &err);
 		i=0;
-		while (idList[i] != null)
+		while (idList[i] != -1)
 		{
-			if (idList[i] == id)
+			if (idList[i] == *id)
 			{
-				id = rand()*256;
+				*id = rand()*256;
 				i=-1;
 			}
 			i++;
 		}
-	}while (idList == (INT8U*)OSMboxPend(idListMB, 0, &err));
+	}while (idList == (int*)OSMboxPend(idListMB, 0, &err));
 
 //	Infinite loop
 /////////////////
     while (1)
 	{
-		
+		OSTaskSuspend(OS_PRIO_SELF);
    	} 	
 }
 
 static  void  StateMachineTask(void *p_arg)
 {
 	INT8U err;
-        int state = INIT_STATE, networkState, previousState;
+        int state, networkState, previousState;
 
    (void)p_arg;	// to avoid a warning message
 
 
 //	Initialisations
 ///////////////////
-	
+		state = INIT_STATE;
         OSMboxPend(idMB, 0, &err);
         state = DISARMED_STATE;
 
@@ -555,9 +513,9 @@ static  void  StateMachineTask(void *p_arg)
 /////////////////
     while (1)
 	{
-                networkState = (INT8U*)OSMboxAccept(statusMsgInMB);
+                networkState = ((int*)OSMboxAccept(statusMsgInMB))[0];
                 previousState = state;
-                if ((/*button pressed*/ || OSSemAccept(HBMissmatchSM)) && state < INTRUSION_STATE)
+                if ((/*button pressed || */OSSemAccept(HBMissmatchSM)) && state < INTRUSION_STATE)
                 {
                     state = INTRUSION_STATE;
                 }
@@ -612,7 +570,7 @@ static  void  AlarmTask(void *p_arg)
 /////////////////
     while (1)
 	{
-                OSSemPend(AlarmSM, 0, &err);
+                OSSemPend(alarmSM, 0, &err);
                 // launch the alarm code
 		
    	} 	
@@ -630,32 +588,32 @@ static  void  SendTask(void *p_arg)
 //	Initialisations
 ///////////////////
         CanInitialisation(CAN_OP_MODE_NORMAL , CAN_BAUDRATE_500k);
-        transmitBuffer.SID = 0x189;
-        transmitBuffer.DLC = 6;
-        transmitBuffer.DATA[0] = 'F';
-        transmitBuffer.DATA[1] = 'N';
-        transmitBuffer.DATA[2] = 'J';
-        transmitBuffer.DATA[3] = 'V';
-        transmitBuffer.DATA[4] = 'V';
-        transmitBuffer.DATA[5] = 'D';
 
-        CanLoadFilter(0, 0x2A);
-        CanLoadFilter(1, 0x2B);
-        CanLoadFilter(2, 0x2C);
-        CanLoadFilter(3, 0x42);
+        CanLoadFilter(HEARTBEAT_FILTER, HEARTBEAT_NET_PRIO);
+        CanLoadFilter(INTRUSION_FILTER, INTRUSION_NET_PRIO);
+        CanLoadFilter(DISARMED_FILTER, DISARMED_NET_PRIO);
+        CanLoadFilter(ARMED_FILTER, ARMED_NET_PRIO);
+		CanLoadFilter(ALARM_FILTER, ALARM_NET_PRIO);
+		CanLoadFilter(PWD_CHG_FILTER, PWD_CHG_NET_PRIO);
         CanLoadMask(0, 0x7FF);
-        CanAssociateMaskFilter(0, 0);
-        CanAssociateMaskFilter(0, 1);
-        CanAssociateMaskFilter(0, 2);
-        CanAssociateMaskFilter(0, 3);
+        CanAssociateMaskFilter(0, HEARTBEAT_FILTER);
+        CanAssociateMaskFilter(0, INTRUSION_FILTER);
+        CanAssociateMaskFilter(0, DISARMED_FILTER);
+        CanAssociateMaskFilter(0, ARMED_FILTER);
+        CanAssociateMaskFilter(0, ALARM_FILTER);
+        CanAssociateMaskFilter(0, PWD_CHG_FILTER);
         ACTIVATE_CAN_INTERRUPTS = 1;
-
 
 //	Infinite loop
 /////////////////
     while (1)
 	{
-
+		transmitBuffer.SID = HEARTBEAT_NET_PRIO;
+        transmitBuffer.DLC = 1;
+        //transmitBuffer.DATA[0] = ((INT8U*)OSMboxAccept(idMB))[0];
+		transmitBuffer.DATA[0] = 0x70;
+		CanSendMessage();
+		OSTimeDly(4000);
    	} 	
 }
 
@@ -708,6 +666,7 @@ static  void  DispStateTask(void *p_arg)
 {
 	INT8U err;
 
+	INT8U *msg;
 
    (void)p_arg;	// to avoid a warning message
 
@@ -732,6 +691,7 @@ static  void  DispKbTask(void *p_arg)
 {
 	INT8U err;
 
+	INT8U *msg;
 
    (void)p_arg;	// to avoid a warning message
 

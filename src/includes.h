@@ -17,6 +17,8 @@
 #include    <string.h>
 #include    <ctype.h>
 #include    <stdlib.h>
+#include	"elec-h-410.h" 
+#include	"constants.h"
 
 #include    <p33FJ256GP710.h>
 
