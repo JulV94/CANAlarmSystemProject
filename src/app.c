@@ -121,10 +121,11 @@ extern  void  AppProbeInit(void);
 //////////////////////////////////////////////////////////////////////////////
 #define INIT_STATE		0
 #define DISARMED_STATE	1
-#define ARMED_STATE		2
-#define INTRUSION_STATE	3
-#define ALARM_STATE		4
-#define PWD_CHG_STATE	5
+#define PWD_CHG_STATE	2
+#define ARMED_STATE		3
+#define INTRUSION_STATE	4
+#define ALARM_STATE		5
+
 
 #define HEARTBEAT_MSG	0
 #define INTRUSION_MSG	1
@@ -539,7 +540,7 @@ static  void  TakeIdTask(void *p_arg)
 static  void  StateMachineTask(void *p_arg)
 {
 	INT8U err;
-
+        int state = INIT_STATE, networkState, previousState;
 
    (void)p_arg;	// to avoid a warning message
 
@@ -547,13 +548,51 @@ static  void  StateMachineTask(void *p_arg)
 //	Initialisations
 ///////////////////
 	
-	
+        OSMboxPend(idMB, 0, &err);
+        state = DISARMED_STATE;
 
 //	Infinite loop
 /////////////////
     while (1)
 	{
-		
+                networkState = (INT8U*)OSMboxAccept(statusMsgInMB);
+                previousState = state;
+                if ((/*button pressed*/ || OSSemAccept(HBMissmatchSM)) && state < INTRUSION_STATE)
+                {
+                    state = INTRUSION_STATE;
+                }
+                if (networkState > state)
+                {
+                    state = networkState;
+                }
+                if (state != previousState)
+                {
+                    switch (state)
+                    {
+                    case INIT_STATE:
+
+                        break;
+                    case DISARMED_STATE:
+
+                        break;
+                    case PWD_CHG_STATE:
+
+                        break;
+                    case ARMED_STATE:
+
+                        break;
+                    case INTRUSION_STATE:
+
+                        break;
+                    case ALARM_STATE:
+
+                        break;
+                    }
+                }
+                if (state != networkState)
+                {
+                    // send state on network
+                }
    	} 	
 }
 
