@@ -1,19 +1,19 @@
 //////////////////////////////////////////////////////////////////////////////
-//									INCLUDES								//
+//																INCLUDES																	//
 //////////////////////////////////////////////////////////////////////////////
 #include <includes.h>	// uC/OSII includes
 #include "Keyboard.h"	// Keyboard functions library
 #include "CanDspic.h"
 
 //////////////////////////////////////////////////////////////////////////////
-//									CONSTANTES								//
+//																	CONSTANTS																//
 //////////////////////////////////////////////////////////////////////////////
 const INT8U hex2ASCII[16] = {	'0', '1', '2', '3', '4', '5', '6', '7',
 								'8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
 
 
 //////////////////////////////////////////////////////////////////////////////
-//								STRUCTURES									//
+//																STRUCTURES																//
 //////////////////////////////////////////////////////////////////////////////
 
 typedef struct {
@@ -22,7 +22,7 @@ typedef struct {
 }CANMsg;
 
 //////////////////////////////////////////////////////////////////////////////
-//									VARIABLES								//
+//																VARIABLES																	//
 //////////////////////////////////////////////////////////////////////////////
 // Tasks stack
 #define  APP_TASK_START_STK_SIZE			128
@@ -33,22 +33,31 @@ OS_STK	HeartbeatCheckTaskStk[HEARTBEAT_CHECK_TASK_STK_SIZE];
 
 #define  HEARTBEAT_TASK_STK_SIZE			128
 OS_STK	HeartbeatTaskStk[HEARTBEAT_TASK_STK_SIZE];
+
 #define  TAKE_ID_TASK_STK_SIZE				128
 OS_STK	TakeIdTaskStk[TAKE_ID_TASK_STK_SIZE];
+
 #define  STATE_MACHINE_TASK_STK_SIZE		128
 OS_STK	StateMachineTaskStk[STATE_MACHINE_TASK_STK_SIZE];
+
 #define  ALARM_TASK_STK_SIZE				128
 OS_STK	AlarmTaskStk[ALARM_TASK_STK_SIZE];
+
 #define  SEND_TASK_STK_SIZE					128
 OS_STK	SendTaskStk[SEND_TASK_STK_SIZE];
+
 #define  READ_KB_TASK_STK_SIZE				128
 OS_STK	ReadKbTaskStk[READ_KB_TASK_STK_SIZE];
+
 #define  PWD_CHECK_TASK_STK_SIZE			128
 OS_STK	PwdCheckTaskStk[PWD_CHECK_TASK_STK_SIZE];
+
 #define  DISP_STATE_TASK_STK_SIZE			128
 OS_STK	DispStateTaskStk[DISP_STATE_TASK_STK_SIZE];
+
 #define  DISP_KB_TASK_STK_SIZE				128
 OS_STK	DispKbTaskStk[DISP_KB_TASK_STK_SIZE];
+
 #define  DISP_CHG_PWD_TASK_STK_SIZE			128
 OS_STK	DispChgPwdTaskStk[DISP_CHG_PWD_TASK_STK_SIZE];
 
@@ -75,7 +84,7 @@ CANMsg *allCANMsgInArray[30];
 
 
 //////////////////////////////////////////////////////////////////////////////
-//							FUNCTION PROTOTYPES								//
+//														FUNCTION PROTOTYPES														//
 //////////////////////////////////////////////////////////////////////////////
 static  void  AppStartTask(void *p_arg);
 static  void  HeartbeatCheckTask(void *p_arg);
@@ -95,7 +104,7 @@ extern  void  AppProbeInit(void);
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
-//							MAIN FUNCTION									//
+//															MAIN FUNCTION																//
 //////////////////////////////////////////////////////////////////////////////
 CPU_INT16S  main (void)
 {
@@ -138,7 +147,7 @@ CPU_INT16S  main (void)
 			OS_TASK_OPT_STK_CHK | OS_TASK_OPT_STK_CLR);
 
 	// defines the App Name (for debug purpose)
-    OSTaskNameSet(APP_TASK_START_PRIO, (CPU_INT08U *)"Start Tasks", &err);
+  OSTaskNameSet(APP_TASK_START_PRIO, (CPU_INT08U *)"Start Tasks", &err);
 	//DispInitOS();
 	OSStart();		// Start multitasking (i.e. give control to uC/OS-II)
 
@@ -147,15 +156,15 @@ CPU_INT16S  main (void)
 
 
 
-//////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
 //								AppStartTask								//
-//////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
 static  void  AppStartTask (void *p_arg)
 {
 	INT8U err;
 
 
-   (void)p_arg;	// to avoid a warning message
+	(void)p_arg;	// to avoid a warning message
 
 
 //	Initialisations
@@ -176,8 +185,7 @@ static  void  AppStartTask (void *p_arg)
 
 //	Tasks creation
 //////////////////
-
-OSTaskCreateExt(
+		OSTaskCreateExt(
 			HeartbeatCheckTask,
 			(void *)0,
 			(OS_STK *)&HeartbeatCheckTaskStk[0],
@@ -188,10 +196,10 @@ OSTaskCreateExt(
 			(void *)0,
 			OS_TASK_OPT_STK_CHK | OS_TASK_OPT_STK_CLR);
 
-	// defines the App Name (for debug purpose)
-    OSTaskNameSet(HEARTBEAT_CHECK_PRIO, (CPU_INT08U *)"Heartbeat check Task", &err);
+		// defines the App Name (for debug purpose)
+		OSTaskNameSet(HEARTBEAT_CHECK_PRIO, (CPU_INT08U *)"Heartbeat check Task", &err);
 
-OSTaskCreateExt(
+		OSTaskCreateExt(
 			HeartbeatTask,		// creates AppStartTask
 			(void *)0,
 			(OS_STK *)&HeartbeatTaskStk[0],
@@ -202,10 +210,10 @@ OSTaskCreateExt(
 			(void *)0,
 			OS_TASK_OPT_STK_CHK | OS_TASK_OPT_STK_CLR);
 
-	// defines the App Name (for debug purpose)
+		// defines the App Name (for debug purpose)
     OSTaskNameSet(HEARTBEAT_PRIO, (CPU_INT08U *)"heartbeat Task", &err);
 
-OSTaskCreateExt(
+		OSTaskCreateExt(
 			TakeIdTask,		// creates AppStartTask
 			(void *)0,
 			(OS_STK *)&TakeIdTaskStk[0],
@@ -216,10 +224,10 @@ OSTaskCreateExt(
 			(void *)0,
 			OS_TASK_OPT_STK_CHK | OS_TASK_OPT_STK_CLR);
 
-	// defines the App Name (for debug purpose)
+		// defines the App Name (for debug purpose)
     OSTaskNameSet(TAKE_ID_PRIO, (CPU_INT08U *)"Take Id Task", &err);
 
-OSTaskCreateExt(
+		OSTaskCreateExt(
 			StateMachineTask,		// creates AppStartTask
 			(void *)0,
 			(OS_STK *)&StateMachineTaskStk[0],
@@ -230,10 +238,10 @@ OSTaskCreateExt(
 			(void *)0,
 			OS_TASK_OPT_STK_CHK | OS_TASK_OPT_STK_CLR);
 
-	// defines the App Name (for debug purpose)
+		// defines the App Name (for debug purpose)
     OSTaskNameSet(STATE_MACHINE_PRIO, (CPU_INT08U *)"STATE MACHINE", &err);
 
-OSTaskCreateExt(
+		OSTaskCreateExt(
 			AlarmTask,		// creates AppStartTask
 			(void *)0,
 			(OS_STK *)&AlarmTaskStk[0],
@@ -244,10 +252,10 @@ OSTaskCreateExt(
 			(void *)0,
 			OS_TASK_OPT_STK_CHK | OS_TASK_OPT_STK_CLR);
 
-	// defines the App Name (for debug purpose)
+		// defines the App Name (for debug purpose)
     OSTaskNameSet(ALARM_PRIO, (CPU_INT08U *)"Alarm Task", &err);
 
-OSTaskCreateExt(
+		OSTaskCreateExt(
 			SendTask,		// creates AppStartTask
 			(void *)0,
 			(OS_STK *)&SendTaskStk[0],
@@ -258,10 +266,10 @@ OSTaskCreateExt(
 			(void *)0,
 			OS_TASK_OPT_STK_CHK | OS_TASK_OPT_STK_CLR);
 
-	// defines the App Name (for debug purpose)
+		// defines the App Name (for debug purpose)
     OSTaskNameSet(SEND_PRIO, (CPU_INT08U *)"Send Task", &err);
 
-OSTaskCreateExt(
+		OSTaskCreateExt(
 			ReadKbTask,		// creates AppStartTask
 			(void *)0,
 			(OS_STK *)&ReadKbTaskStk[0],
@@ -272,10 +280,10 @@ OSTaskCreateExt(
 			(void *)0,
 			OS_TASK_OPT_STK_CHK | OS_TASK_OPT_STK_CLR);
 
-	// defines the App Name (for debug purpose)
+		// defines the App Name (for debug purpose)
     OSTaskNameSet(READ_KB_PRIO, (CPU_INT08U *)"Read Kb Task", &err);
 
-OSTaskCreateExt(
+		OSTaskCreateExt(
 			PwdCheckTask,
 			(void *)0,
 			(OS_STK *)&PwdCheckTaskStk[0],
@@ -286,10 +294,10 @@ OSTaskCreateExt(
 			(void *)0,
 			OS_TASK_OPT_STK_CHK | OS_TASK_OPT_STK_CLR);
 
-	// defines the App Name (for debug purpose)
+		// defines the App Name (for debug purpose)
     OSTaskNameSet(PWD_CHECK_PRIO, (CPU_INT08U *)"Pwd Check Task", &err);
 
-OSTaskCreateExt(
+		OSTaskCreateExt(
 			DispChgPwdTask,
 			(void *)0,
 			(OS_STK *)&DispChgPwdTaskStk[0],
@@ -300,11 +308,11 @@ OSTaskCreateExt(
 			(void *)0,
 			OS_TASK_OPT_STK_CHK | OS_TASK_OPT_STK_CLR);
 
-	// defines the App Name (for debug purpose)
+		// defines the App Name (for debug purpose)
     OSTaskNameSet(DISP_CHG_PWD_PRIO, (CPU_INT08U *)"Disp Chg Pwd Task", &err);
 
 
-OSTaskCreateExt(
+		OSTaskCreateExt(
 			DispStateTask,
 			(void *)0,
 			(OS_STK *)&DispStateTaskStk[0],
@@ -315,10 +323,10 @@ OSTaskCreateExt(
 			(void *)0,
 			OS_TASK_OPT_STK_CHK | OS_TASK_OPT_STK_CLR);
 
-	// defines the App Name (for debug purpose)
+		// defines the App Name (for debug purpose)
     OSTaskNameSet(DISP_STATE_PRIO, (CPU_INT08U *)"Disp State Task", &err);
 
-OSTaskCreateExt(
+		OSTaskCreateExt(
 			DispKbTask,
 			(void *)0,
 			(OS_STK *)&DispKbTaskStk[0],
@@ -329,14 +337,14 @@ OSTaskCreateExt(
 			(void *)0,
 			OS_TASK_OPT_STK_CHK | OS_TASK_OPT_STK_CLR);
 
-	// defines the App Name (for debug purpose)
+		// defines the App Name (for debug purpose)
     OSTaskNameSet(DISP_KB_PRIO, (CPU_INT08U *)"Disp Kb Task", &err);
 
 //	Infinite loop
 /////////////////
     while (42)
-	{
-		OSTaskSuspend(OS_PRIO_SELF);
+		{
+			OSTaskSuspend(OS_PRIO_SELF);
    	}
 }
 
@@ -344,7 +352,7 @@ static  void  HeartbeatCheckTask(void *p_arg)
 {
 	INT8U err;
 
-   (void)p_arg;	// to avoid a warning message
+  (void)p_arg;	// to avoid a warning message
 
 	INT8U *id;
 	INT8U *state;
@@ -366,13 +374,13 @@ static  void  HeartbeatCheckTask(void *p_arg)
 //	Infinite loop
 /////////////////
     while (42)
-	{
-		id = (INT8U*)OSMboxAccept(idMB);
-		time = (2e32-1)-abs(OSTimeGet()-endTime);
-		for (i=0; i<256; i++)
 		{
-			nodesTTL[i]-=time;
-			if (nodesTTL[i] <= 0)
+			id = (INT8U*)OSMboxAccept(idMB);
+			time = (2e32-1)-abs(OSTimeGet()-endTime);
+			for (i=0; i<256; i++)
+			{
+				nodesTTL[i]-=time;
+				if (nodesTTL[i] <= 0)
 			{
 				nodesTTL[i]=0;
 			}
@@ -428,7 +436,7 @@ static  void  HeartbeatTask(void *p_arg)
 	INT8U err;
 
 
-   (void)p_arg;	// to avoid a warning message
+	(void)p_arg;	// to avoid a warning message
 
 	INT8U *id;
 	INT32U timeStart;
@@ -443,12 +451,12 @@ static  void  HeartbeatTask(void *p_arg)
 //	Infinite loop
 /////////////////
     while (1)
-	{
-		timeStart = OSTimeGet();
-		id = (INT8U*)OSMboxAccept(idMB);
-		err = OSMboxPost(heartbeatMB, (void *)&heartbeat);
-		TASK_ENABLE2^=1;
-		OSTimeDly(HEARTBEAT_PERIOD-(4294967295-abs(OSTimeGet()-timeStart))); // 2^32-1
+		{
+			timeStart = OSTimeGet();
+			id = (INT8U*)OSMboxAccept(idMB);
+			err = OSMboxPost(heartbeatMB, (void *)&heartbeat);
+			TASK_ENABLE2^=1;
+			OSTimeDly(HEARTBEAT_PERIOD-(4294967295-abs(OSTimeGet()-timeStart))); // 2^32-1
    	}
 }
 
@@ -460,7 +468,7 @@ static  void  TakeIdTask(void *p_arg)
 	int *idList;
 	int i;
 
-   (void)p_arg;	// to avoid a warning message
+  (void)p_arg;	// to avoid a warning message
 
 
 //	Initialisations
@@ -485,29 +493,29 @@ static  void  TakeIdTask(void *p_arg)
 //	Infinite loop
 /////////////////
     while (1)
-	{
-		OSTaskSuspend(OS_PRIO_SELF);
+		{
+			OSTaskSuspend(OS_PRIO_SELF);
    	}
 }
 
 static  void  StateMachineTask(void *p_arg)
 {
 	INT8U err;
-        int state, networkState, previousState;
+  int state, networkState, previousState;
 
-   (void)p_arg;	// to avoid a warning message
+  (void)p_arg;	// to avoid a warning message
 
 
 //	Initialisations
 ///////////////////
-		state = INIT_STATE;
-		OSMboxPend(idMB, 0, &err);
-    state = DISARMED_STATE;
+	state = INIT_STATE;
+	OSMboxPend(idMB, 0, &err);
+  state = DISARMED_STATE;
 
 //	Infinite loop
 /////////////////
-    while (1)
-	{
+  	while (1)
+		{
                 networkState = ((int*)OSMboxAccept(statusMsgInMB))[0];
                 previousState = state;
                 if ((/*button pressed || */OSSemAccept(HBMissmatchSM)) && state < INTRUSION_STATE)
@@ -554,7 +562,7 @@ static  void  AlarmTask(void *p_arg)
 	INT8U err;
 
 
-   (void)p_arg;	// to avoid a warning message
+  (void)p_arg;	// to avoid a warning message
 
 
 //	Initialisations
@@ -563,8 +571,8 @@ static  void  AlarmTask(void *p_arg)
 
 //	Infinite loop
 /////////////////
-    while (1)
-	{
+  	while (1)
+		{
                 OSSemPend(alarmSM, 0, &err);
                 // launch the alarm code
 
@@ -577,7 +585,7 @@ static  void  SendTask(void *p_arg)
 	INT8U err;
 
 
-   (void)p_arg;	// to avoid a warning message
+  (void)p_arg;	// to avoid a warning message
 
 
 //	Initialisations
@@ -602,13 +610,13 @@ static  void  SendTask(void *p_arg)
 //	Infinite loop
 /////////////////
     while (1)
-	{
-		transmitBuffer.SID = HEARTBEAT_NET_PRIO;
-    transmitBuffer.DLC = 1;
-    //transmitBuffer.DATA[0] = ((INT8U*)OSMboxAccept(idMB))[0];
-		transmitBuffer.DATA[0] = 0x70;
-		CanSendMessage();
-		OSTimeDly(4000);
+		{
+			transmitBuffer.SID = HEARTBEAT_NET_PRIO;
+	    transmitBuffer.DLC = 1;
+	    //transmitBuffer.DATA[0] = ((INT8U*)OSMboxAccept(idMB))[0];
+			transmitBuffer.DATA[0] = 0x70;
+			CanSendMessage();
+			OSTimeDly(4000);
    	}
 }
 
@@ -618,18 +626,18 @@ static  void  ReadKbTask(void *p_arg)
 	INT8U err;
 
 
-   (void)p_arg;	// to avoid a warning message
+  (void)p_arg;	// to avoid a warning message
 
 
 //	Initialisations
 ///////////////////
-        INT32U timeStart;
+  INT32U timeStart;
 
 
 //	Infinite loop
 /////////////////
     while (1)
-	{
+		{
             timeStart = OSTimeGet();
 
 
@@ -642,7 +650,7 @@ static  void  PwdCheckTask(void *p_arg)
 	INT8U err;
 
 
-   (void)p_arg;	// to avoid a warning message
+  (void)p_arg;	// to avoid a warning message
 
 
 //	Initialisations
@@ -652,7 +660,7 @@ static  void  PwdCheckTask(void *p_arg)
 //	Infinite loop
 /////////////////
     while (1)
-	{
+		{
 
    	}
 }
@@ -663,7 +671,7 @@ static  void  DispStateTask(void *p_arg)
 
 	INT8U *msg;
 
-   (void)p_arg;	// to avoid a warning message
+  (void)p_arg;	// to avoid a warning message
 
 
 //	Initialisations
@@ -675,7 +683,7 @@ static  void  DispStateTask(void *p_arg)
 //	Infinite loop
 /////////////////
     while (1)
-	{
+		{
                 msg = (INT8U*)OSMboxPend(stateMB, 0, &err);
                 DispClrScr();
                 DispStr(0, 0, msg);
@@ -688,7 +696,7 @@ static  void  DispKbTask(void *p_arg)
 
 	INT8U *msg;
 
-   (void)p_arg;	// to avoid a warning message
+  (void)p_arg;	// to avoid a warning message
 
 
 //	Initialisations
@@ -699,7 +707,7 @@ static  void  DispKbTask(void *p_arg)
 //	Infinite loop
 /////////////////
     while (1)
-	{
+		{
                 msg = (INT8U*)OSMboxPend(validationResultMB, 0, &err);
                 DispClrScr();
                 DispStr(0, 0, msg);
@@ -711,7 +719,7 @@ static  void  DispChgPwdTask(void *p_arg)
 	INT8U err;
 
 
-   (void)p_arg;	// to avoid a warning message
+  (void)p_arg;	// to avoid a warning message
 
 
 //	Initialisations
@@ -722,7 +730,7 @@ static  void  DispChgPwdTask(void *p_arg)
 //	Infinite loop
 /////////////////
     while (1)
-	{
+		{
 
    	}
 }
