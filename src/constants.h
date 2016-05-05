@@ -1,6 +1,8 @@
 #ifndef CONSTANTS_H
 #define CONSTANTS_H
 
+#define PASSWD                            1234
+
 /////////////////////////////////////////////////////////////////////////////
 //                              TASK PRIORITIES                            //
 /////////////////////////////////////////////////////////////////////////////
@@ -11,7 +13,6 @@
 #define  TAKE_ID_PRIO						          13
 #define  STATE_MACHINE_PRIO               15
 #define  ALARM_PRIO                   	  20
-#define  SEND_PRIO                     	  25
 #define  READ_KB_PRIO                     28
 #define  PWD_CHECK_PRIO                   30
 #define  DISP_STATE_PRIO                 	40
@@ -42,7 +43,7 @@
 
 // Periods
 #define HEARTBEAT_PERIOD                  4000
-#define READ_KB_PERIOD                    100
+#define READ_KB_PERIOD                    50
 
 /////////////////////////////////////////////////////////////////////////////
 //                                 PROTOCOLS                               //
