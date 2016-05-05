@@ -110,7 +110,7 @@ CPU_INT16S  main (void)
 	alarmSM = OSSemCreate(1);
 	validPwdOkSM = OSSemCreate(2);
 	HBMissmatchSM = OSSemCreate(3);
-	
+
 	// create mailbox
 	idListMB = OSMboxCreate((void *)0);
 	idMB = OSMboxCreate((void *)0);
@@ -139,13 +139,8 @@ CPU_INT16S  main (void)
 
 	// defines the App Name (for debug purpose)
     OSTaskNameSet(APP_TASK_START_PRIO, (CPU_INT08U *)"Start Tasks", &err);
-    
-    
 	//DispInitOS();
 	OSStart();		// Start multitasking (i.e. give control to uC/OS-II)
-
-	
-	//LedTask();
 
 	return (-1);	// Return an error - This line of code is unreachable
 }
@@ -335,14 +330,14 @@ OSTaskCreateExt(
 			OS_TASK_OPT_STK_CHK | OS_TASK_OPT_STK_CLR);
 
 	// defines the App Name (for debug purpose)
-    OSTaskNameSet(DISP_KB_PRIO, (CPU_INT08U *)"Disp Kb Task", &err);	
+    OSTaskNameSet(DISP_KB_PRIO, (CPU_INT08U *)"Disp Kb Task", &err);
 
 //	Infinite loop
 /////////////////
     while (42)
 	{
 		OSTaskSuspend(OS_PRIO_SELF);
-   	} 	
+   	}
 }
 
 static  void  HeartbeatCheckTask(void *p_arg)
@@ -365,14 +360,14 @@ static  void  HeartbeatCheckTask(void *p_arg)
 	static INT8U HBMissmatchBuf;
 
 	TASK_ENABLE1=1;
-	
+
 	id = (INT8U*)OSMboxPend(idMB, 0, &err);
 
 //	Infinite loop
 /////////////////
     while (42)
 	{
-	/*	id = (INT8U*)OSMboxAccept(idMB);
+		id = (INT8U*)OSMboxAccept(idMB);
 		time = (2e32-1)-abs(OSTimeGet()-endTime);
 		for (i=0; i<256; i++)
 		{
@@ -418,11 +413,11 @@ static  void  HeartbeatCheckTask(void *p_arg)
 					}
 					size++;
 				}
-				
+
 			}
 		}
 		err = OSMboxPost(idListMB, (void *)&fixedIdList[0]);
-		//err = OSQFlush(allCANMsgInQueue);*/
+		//err = OSQFlush(allCANMsgInQueue);
 		TASK_ENABLE1^=1;
 		OSTimeDly(50);
    	}
@@ -441,20 +436,20 @@ static  void  HeartbeatTask(void *p_arg)
 	TASK_ENABLE2=1;
 //	Initialisations
 ///////////////////
-/*	id = (INT8U*)OSMboxPend(idMB, 0, &err);
+	id = (INT8U*)OSMboxPend(idMB, 0, &err);
 	heartbeat.id = *id;
 	heartbeat.msg = HEARTBEAT_MSG;
-*/
+
 //	Infinite loop
 /////////////////
     while (1)
 	{
-//		timeStart = OSTimeGet();
-	//	id = (INT8U*)OSMboxAccept(idMB);
-	//	err = OSMboxPost(heartbeatMB, (void *)&heartbeat);
+		timeStart = OSTimeGet();
+		id = (INT8U*)OSMboxAccept(idMB);
+		err = OSMboxPost(heartbeatMB, (void *)&heartbeat);
 		TASK_ENABLE2^=1;
-		OSTimeDly(100);//-((2-1)-abs(OSTimeGet()-timeStart)));
-   	} 	
+		OSTimeDly(HEARTBEAT_PERIOD-(4294967295-abs(OSTimeGet()-timeStart))); // 2^32-1
+   	}
 }
 
 static  void  TakeIdTask(void *p_arg)
@@ -471,7 +466,7 @@ static  void  TakeIdTask(void *p_arg)
 //	Initialisations
 ///////////////////
 	*id = rand()*256;
-	
+
 	do {
 		err = OSMboxPost(idMB, (void *)&id);
 		idList = (int*)OSMboxPend(idListMB, 0, &err);
@@ -492,7 +487,7 @@ static  void  TakeIdTask(void *p_arg)
     while (1)
 	{
 		OSTaskSuspend(OS_PRIO_SELF);
-   	} 	
+   	}
 }
 
 static  void  StateMachineTask(void *p_arg)
@@ -506,8 +501,8 @@ static  void  StateMachineTask(void *p_arg)
 //	Initialisations
 ///////////////////
 		state = INIT_STATE;
-        OSMboxPend(idMB, 0, &err);
-        state = DISARMED_STATE;
+		OSMboxPend(idMB, 0, &err);
+    state = DISARMED_STATE;
 
 //	Infinite loop
 /////////////////
@@ -551,7 +546,7 @@ static  void  StateMachineTask(void *p_arg)
                 {
                     // send state on network
                 }
-   	} 	
+   	}
 }
 
 static  void  AlarmTask(void *p_arg)
@@ -572,8 +567,8 @@ static  void  AlarmTask(void *p_arg)
 	{
                 OSSemPend(alarmSM, 0, &err);
                 // launch the alarm code
-		
-   	} 	
+
+   	}
 }
 
 static  void  SendTask(void *p_arg)
@@ -593,8 +588,8 @@ static  void  SendTask(void *p_arg)
         CanLoadFilter(INTRUSION_FILTER, INTRUSION_NET_PRIO);
         CanLoadFilter(DISARMED_FILTER, DISARMED_NET_PRIO);
         CanLoadFilter(ARMED_FILTER, ARMED_NET_PRIO);
-		CanLoadFilter(ALARM_FILTER, ALARM_NET_PRIO);
-		CanLoadFilter(PWD_CHG_FILTER, PWD_CHG_NET_PRIO);
+				CanLoadFilter(ALARM_FILTER, ALARM_NET_PRIO);
+				CanLoadFilter(PWD_CHG_FILTER, PWD_CHG_NET_PRIO);
         CanLoadMask(0, 0x7FF);
         CanAssociateMaskFilter(0, HEARTBEAT_FILTER);
         CanAssociateMaskFilter(0, INTRUSION_FILTER);
@@ -609,12 +604,12 @@ static  void  SendTask(void *p_arg)
     while (1)
 	{
 		transmitBuffer.SID = HEARTBEAT_NET_PRIO;
-        transmitBuffer.DLC = 1;
-        //transmitBuffer.DATA[0] = ((INT8U*)OSMboxAccept(idMB))[0];
+    transmitBuffer.DLC = 1;
+    //transmitBuffer.DATA[0] = ((INT8U*)OSMboxAccept(idMB))[0];
 		transmitBuffer.DATA[0] = 0x70;
 		CanSendMessage();
 		OSTimeDly(4000);
-   	} 	
+   	}
 }
 
 static  void  ReadKbTask(void *p_arg)
@@ -638,8 +633,8 @@ static  void  ReadKbTask(void *p_arg)
             timeStart = OSTimeGet();
 
 
-            OSTimeDly(READ_KB_PERIOD-((2e32-1)-abs(OSTimeGet()-timeStart)));
-   	} 	
+            OSTimeDly(READ_KB_PERIOD-(4294967295-abs(OSTimeGet()-timeStart)));  // 2^32-1
+   	}
 }
 
 static  void  PwdCheckTask(void *p_arg)
@@ -652,14 +647,14 @@ static  void  PwdCheckTask(void *p_arg)
 
 //	Initialisations
 ///////////////////
-	
+
 
 //	Infinite loop
 /////////////////
     while (1)
 	{
 
-   	} 	
+   	}
 }
 
 static  void  DispStateTask(void *p_arg)
@@ -673,7 +668,7 @@ static  void  DispStateTask(void *p_arg)
 
 //	Initialisations
 ///////////////////
-	
+
 	DispInit(2, 16);
 	DispClrScr();
 
@@ -684,7 +679,7 @@ static  void  DispStateTask(void *p_arg)
                 msg = (INT8U*)OSMboxPend(stateMB, 0, &err);
                 DispClrScr();
                 DispStr(0, 0, msg);
-   	} 	
+   	}
 }
 
 static  void  DispKbTask(void *p_arg)
@@ -699,7 +694,7 @@ static  void  DispKbTask(void *p_arg)
 //	Initialisations
 ///////////////////
         // Done in DispStateTask()
-	
+
 
 //	Infinite loop
 /////////////////
@@ -708,7 +703,7 @@ static  void  DispKbTask(void *p_arg)
                 msg = (INT8U*)OSMboxPend(validationResultMB, 0, &err);
                 DispClrScr();
                 DispStr(0, 0, msg);
-   	} 	
+   	}
 }
 
 static  void  DispChgPwdTask(void *p_arg)
@@ -721,7 +716,7 @@ static  void  DispChgPwdTask(void *p_arg)
 
 //	Initialisations
 ///////////////////
-	
+
 
 
 //	Infinite loop
@@ -729,5 +724,5 @@ static  void  DispChgPwdTask(void *p_arg)
     while (1)
 	{
 
-   	} 	
+   	}
 }
