@@ -1,7 +1,10 @@
 #ifndef CONSTANTS_H
 #define CONSTANTS_H
 
-#define PASSWD                            1234
+#define PASSWD0                           1
+#define PASSWD1                           2
+#define PASSWD2                           3
+#define PASSWD3                           4
 
 /////////////////////////////////////////////////////////////////////////////
 //                              TASK PRIORITIES                            //

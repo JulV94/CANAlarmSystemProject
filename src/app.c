@@ -651,6 +651,9 @@ static  void  ReadKbTask(void *p_arg)
 static  void  PwdCheckTask(void *p_arg)
 {
 	INT8U err;
+	INT8U *newChar
+	int charCount
+	INT8U currentPwd[4];
 
 
   (void)p_arg;	// to avoid a warning message
@@ -658,13 +661,33 @@ static  void  PwdCheckTask(void *p_arg)
 
 //	Initialisations
 ///////////////////
-
+charCount=0;
+currentPwd={0};
 
 //	Infinite loop
 /////////////////
     while (1)
 		{
-
+			newChar = (INT8U*)OSMboxPend(charTypedMB, 0, &err);
+			charCount++;
+			if (charCount < 4) // password not completely typed
+			{
+				OSMboxPost(validationResultMB, (void*)&charCount);
+			}
+			else
+			{
+				charCount=0;
+				if (currentPwd[0] == PASSWD0 && currentPwd[1] == PASSWD1 && currentPwd[2] == PASSWD2 && currentPwd[3] == PASSWD3) // password correct
+				{
+					OSMboxPost(validationResultMB, 0);
+					// add MB to state machine validation
+				}
+				else // wrong password
+				{
+					OSMboxPost(validationResultMB, -1);
+					// add MB to state machine validation
+				}
+			}
    	}
 }
 
@@ -672,7 +695,7 @@ static  void  DispStateTask(void *p_arg)
 {
 	INT8U err;
 
-	INT8U *msg;
+	INT8U *state;
 
   (void)p_arg;	// to avoid a warning message
 
@@ -687,9 +710,31 @@ static  void  DispStateTask(void *p_arg)
 /////////////////
     while (1)
 		{
-                msg = (INT8U*)OSMboxPend(stateMB, 0, &err);
+                state = (INT8U*)OSMboxPend(stateMB, 0, &err);
                 DispClrScr();
-                DispStr(0, 0, msg);
+								switch (*state)
+								{
+								case INIT_STATE:
+										DispStr(0, 0, "Initializing...");
+										break;
+								case DISARMED_STATE:
+										DispStr(0, 0, "Disarmed");
+										break;
+								case PWD_CHG_STATE:
+										DispStr(0, 0, "Insert a new");
+										DispStr(1, 0, "password");
+										break;
+								case ARMED_STATE:
+										DispStr(0, 0, "Armed");
+										break;
+								case INTRUSION_STATE:
+										DispStr(0, 0, "Intrusion");
+										DispStr(1, 0, "detected !");
+										break;
+								case ALARM_STATE:
+										DispStr(0, 0, "Alarm ringing");
+										break;
+								}
    	}
 }
 
@@ -697,7 +742,7 @@ static  void  DispKbTask(void *p_arg)
 {
 	INT8U err;
 
-	INT8U *msg;
+	int *msg;
 
   (void)p_arg;	// to avoid a warning message
 
@@ -711,9 +756,26 @@ static  void  DispKbTask(void *p_arg)
 /////////////////
     while (1)
 		{
-                msg = (INT8U*)OSMboxPend(validationResultMB, 0, &err);
+                msg = (int*)OSMboxPend(validationResultMB, 0, &err);
                 DispClrScr();
-                DispStr(0, 0, msg);
+								switch (*msg)
+								{
+								case -1:
+										DispStr(0, 0, "Wrong password");
+										break;
+								case 0:
+										DispStr(0, 0, "Password OK");
+										break;
+								case 1:
+										DispStr(0, 0, "*");
+										break;
+								case 2:
+										DispStr(0, 0, "**");
+										break;
+								case 3:
+										DispStr(0, 0, "***");
+										break;
+								}
    	}
 }
 
