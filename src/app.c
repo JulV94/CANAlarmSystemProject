@@ -43,9 +43,6 @@ OS_STK	StateMachineTaskStk[STATE_MACHINE_TASK_STK_SIZE];
 #define  ALARM_TASK_STK_SIZE				128
 OS_STK	AlarmTaskStk[ALARM_TASK_STK_SIZE];
 
-#define  SEND_TASK_STK_SIZE					128
-OS_STK	SendTaskStk[SEND_TASK_STK_SIZE];
-
 #define  READ_KB_TASK_STK_SIZE				128
 OS_STK	ReadKbTaskStk[READ_KB_TASK_STK_SIZE];
 
@@ -62,7 +59,6 @@ OS_STK	DispKbTaskStk[DISP_KB_TASK_STK_SIZE];
 OS_STK	DispChgPwdTaskStk[DISP_CHG_PWD_TASK_STK_SIZE];
 
 // Semaphores
-OS_EVENT *alarmSM;
 OS_EVENT *validPwdOkSM;
 OS_EVENT *HBMissmatchSM;
 
@@ -117,7 +113,6 @@ CPU_INT16S  main (void)
 	OSInit();			// Initialize "uC/OS-II, The Real-Time Kernel"
 
 	// create semaphores
-	alarmSM = OSSemCreate(1);
 	validPwdOkSM = OSSemCreate(2);
 	HBMissmatchSM = OSSemCreate(3);
 
@@ -412,7 +407,7 @@ static  void  HeartbeatCheckTask(void *p_arg)
 			}
 		}
 		err = OSMboxPost(idListMB, (void *)&fixedIdList[0]);
-		//err = OSQFlush(allCANMsgInQueue);
+		err = OSQFlush(allCANMsgInQueue);
 		OSTimeDly(50);
    	}
 }
@@ -598,6 +593,7 @@ static  void  AlarmTask(void *p_arg)
 {
 	INT8U err;
 
+	INT8U *state;
 
   (void)p_arg;	// to avoid a warning message
 
@@ -610,8 +606,15 @@ static  void  AlarmTask(void *p_arg)
 /////////////////
   	while (1)
 		{
-                OSSemPend(alarmSM, 0, &err);
-                // launch the alarm code
+                state = (INT8U*)OSMboxPend(stateMB, 0, &err);
+								if (*state == ALARM_STATE)
+								{
+									// launch the alarm code
+								}
+								else
+								{
+									// stop alarm code
+								}
 
    	}
 }
@@ -669,6 +672,7 @@ currentPwd={0};
     while (1)
 		{
 			newChar = (INT8U*)OSMboxPend(charTypedMB, 0, &err);
+			currentPwd[charCount] = *newChar;
 			charCount++;
 			if (charCount < 4) // password not completely typed
 			{
