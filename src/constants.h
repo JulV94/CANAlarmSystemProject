@@ -11,9 +11,9 @@
 /////////////////////////////////////////////////////////////////////////////
 
 #define  APP_TASK_START_PRIO              9
-#define  HEARTBEAT_CHECK_PRIO             11
-#define  HEARTBEAT_PRIO							      12
-#define  TAKE_ID_PRIO						          13
+#define  HEARTBEAT_CHECK_PRIO             12
+#define  HEARTBEAT_PRIO							      13
+#define  TAKE_ID_PRIO						          14
 #define  STATE_MACHINE_PRIO               15
 #define  ALARM_PRIO                   	  20
 #define  READ_KB_PRIO                     28
@@ -48,6 +48,8 @@
 #define HEARTBEAT_PERIOD                  4000
 #define READ_KB_PERIOD                    50
 #define STATE_DISP_REFRESH_PERIOD				  1000
+#define HEARTBEAT_CHECK_PERIOD			  500
+#define ALARM_PERIOD					  500
 
 /////////////////////////////////////////////////////////////////////////////
 //                                 PROTOCOLS                               //

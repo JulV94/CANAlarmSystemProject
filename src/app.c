@@ -63,7 +63,7 @@ OS_EVENT *CANMsgOutMB;
 
 // Queues
 OS_EVENT *allCANMsgInQueue;
-INT8U *allCANMsgInArray[30];
+INT8U *allCANMsgInArray[200];
 
 // Mutex
 OS_EVENT *netBufMutex;
@@ -107,8 +107,8 @@ CPU_INT16S  main (void)
 	OSInit();			// Initialize "uC/OS-II, The Real-Time Kernel"
 
 	// create semaphores
-	validPwdOkSM = OSSemCreate(2);
-	HBMissmatchSM = OSSemCreate(3);
+	validPwdOkSM = OSSemCreate(0);
+	HBMissmatchSM = OSSemCreate(0);
 
 	// create mailbox
 	idListMB = OSMboxCreate((void *)0);
@@ -120,12 +120,20 @@ CPU_INT16S  main (void)
 	CANMsgOutMB = OSMboxCreate((void *)0);
 
 	// create queues
-	allCANMsgInQueue = OSQCreate((void*)&allCANMsgInArray[0], 20);
+	allCANMsgInQueue = OSQCreate((void*)&allCANMsgInArray[0], 200);
 
 	// create Mutex
 	netBufMutex = OSMutexCreate(11, &err); // All task created can use the mutex
 	idMutex = OSMutexCreate(11, &err);
 	stateMutex = OSMutexCreate(11, &err);
+
+	// enable interruptions button
+	IEC1bits.CNIE = 1;
+	CNEN1bits.CN15IE = 1;
+
+	R6 input
+	CN15 activate
+	activate change notification block interrupt
 
 	OSTaskCreateExt(
 			AppStartTask,		// creates AppStartTask
@@ -190,6 +198,8 @@ static  void  AppStartTask (void *p_arg)
 
 		// defines the App Name (for debug purpose)
 		OSTaskNameSet(HEARTBEAT_CHECK_PRIO, (CPU_INT08U *)"Heartbeat check Task", &err);
+
+		TASK_ENABLE1=0;
 
 		OSTaskCreateExt(
 			HeartbeatTask,		// creates AppStartTask
@@ -335,12 +345,12 @@ static  void  HeartbeatCheckTask(void *p_arg)
 
 //	Initialisations
 ///////////////////
-	INT16U nodesTTL[256] = {0};
+	int nodesTTL[256] = {0};
 	int fixedIdList[256];
 	INT8U *msgInQueue;
 	INT32U endTime=OSTimeGet();
 	INT32U time;
-	int i, j, sizeFixedList, size;
+	int i, j, sizeFixedList, size, multiple=0;
 	static INT8U HBMissmatchBuf;
 
 	TASK_ENABLE1=1;
@@ -349,7 +359,7 @@ static  void  HeartbeatCheckTask(void *p_arg)
 /////////////////
     while (42)
 		{
-			time = 4294967295-abs(OSTimeGet()-endTime);
+			time = /*4294967295-*/abs(OSTimeGet()-endTime);
 			for (i=0; i<256; i++)
 			{
 				nodesTTL[i]-=time;
@@ -360,7 +370,8 @@ static  void  HeartbeatCheckTask(void *p_arg)
 		}
 		endTime=OSTimeGet();
 		j=0;
-		while (msgInQueue = (INT8U*)OSQPend(allCANMsgInQueue, 100, &err))
+		msgInQueue = (INT8U*)OSQPend(allCANMsgInQueue, 100, &err);
+		while (msgInQueue[j] != NULL)
 		{
 			nodesTTL[msgInQueue[j]]=5000;
 			j++;
@@ -368,13 +379,14 @@ static  void  HeartbeatCheckTask(void *p_arg)
 		OSMutexPend(stateMutex, 0, &err);
 		stateCpy=state;
 		OSMutexPost(stateMutex);
+		stateCpy=INIT_STATE;
 		if (stateCpy == INIT_STATE || stateCpy == DISARMED_STATE || stateCpy == PWD_CHG_STATE)
 		{
 			// update fixed list
 			Mem_Set((void*)&fixedIdList[0], -1, sizeof(int)*256);
+			sizeFixedList=0;
 			for (i=0; i<256; i++)
 			{
-				int sizeFixedList=0;
 				if (nodesTTL[i] > 0)
 				{
 					fixedIdList[sizeFixedList]=i;
@@ -402,10 +414,16 @@ static  void  HeartbeatCheckTask(void *p_arg)
 
 			}
 		}
-		err = OSMboxPost(idListMB, (void *)&fixedIdList[0]);
+		if (multiple >= 5000)
+		{
+			err = OSMboxPost(idListMB, (void *)&fixedIdList[0]);
+			multiple=0;
+			TASK_ENABLE1^=1;
+			TASK_ENABLE1=1;
+		}
 		//err = OSQFlush(allCANMsgInQueue);
-		TASK_ENABLE1^=1;
-		OSTimeDly(50);
+		multiple+=HEARTBEAT_CHECK_PERIOD;
+		OSTimeDly(HEARTBEAT_CHECK_PERIOD);
    	}
 }
 
@@ -452,6 +470,9 @@ static  void  TakeIdTask(void *p_arg)
 
 //	Initialisations
 ///////////////////
+	OSMutexPend(stateMutex, 0, &err);
+	state=INIT_STATE;
+	OSMutexPost(stateMutex);
 	OSMutexPend(idMutex, 0, &err);
 	id = rand()%256;
 	OSMutexPost(idMutex);
@@ -465,13 +486,16 @@ static  void  TakeIdTask(void *p_arg)
 			if (idList[i] == id)
 			{
 				OSMutexPend(idMutex, 0, &err);
-				id = rand()*256;
+				id = rand()%256;
 				OSMutexPost(idMutex);
 				i=-1;
 			}
 			i++;
 		}
 	}while (idList == (int*)OSMboxPend(idListMB, 0, &err));
+	OSMutexPend(stateMutex, 0, &err);
+  	state = DISARMED_STATE;
+	OSMutexPost(stateMutex);
 	TASK_ENABLE3=0;
 
 //	Infinite loop
@@ -481,8 +505,6 @@ static  void  TakeIdTask(void *p_arg)
 			OSTaskSuspend(OS_PRIO_SELF);
    	}
 }
-
-int test;
 
 static  void  StateMachineTask(void *p_arg)
 {
@@ -494,9 +516,6 @@ static  void  StateMachineTask(void *p_arg)
 
 //	Initialisations
 ///////////////////
-	OSMutexPend(stateMutex,0, &err);
-	state = INIT_STATE;
-	OSMutexPost(stateMutex);
 	CanInitialisation(CAN_OP_MODE_NORMAL , CAN_BAUDRATE_500k);
 	CanLoadFilter(HEARTBEAT_FILTER, HEARTBEAT_NET_PRIO);
 	CanLoadFilter(INTRUSION_FILTER, INTRUSION_NET_PRIO);
@@ -513,10 +532,6 @@ static  void  StateMachineTask(void *p_arg)
 	CanAssociateMaskFilter(0, PWD_CHG_FILTER);
 	ACTIVATE_CAN_INTERRUPTS = 1;
 
-	OSMutexPend(stateMutex, 0, &err);
-  state = DISARMED_STATE;
-	OSMutexPost(stateMutex);
-
 //	Infinite loop
 /////////////////
   	while (1)
@@ -524,8 +539,8 @@ static  void  StateMachineTask(void *p_arg)
                 networkState = ((int*)OSMboxAccept(statusMsgInMB))[0];
 				OSMutexPend(stateMutex, 0, &err);
                 previousState = state;
-				test = OSSemAccept(HBMissmatchSM);
-                if ((/*button pressed || */!test) && state < INTRUSION_STATE)
+				
+                if ((/*button pressed || */OSSemAccept(HBMissmatchSM)) && state < INTRUSION_STATE)
                 {
                     state = INTRUSION_STATE;
                 }
@@ -596,7 +611,7 @@ static  void  StateMachineTask(void *p_arg)
 										OSMutexPost(netBufMutex);
 									}
 		OSMutexPost(stateMutex);
-		OSTimeDly(75);
+		OSTimeDly(500);
    	}
 }
 
@@ -605,6 +620,8 @@ static  void  AlarmTask(void *p_arg)
 	INT8U err;
 
 	INT8U stateCpy;
+
+	TASK_ENABLE1=0;
 
   (void)p_arg;	// to avoid a warning message
 
@@ -628,6 +645,7 @@ static  void  AlarmTask(void *p_arg)
 								{
 									// stop alarm code
 								}
+								OSTimeDly(ALARM_PERIOD);
 
    	}
 }
@@ -638,8 +656,10 @@ static  void  ReadKbTask(void *p_arg)
 	INT8U err;
 	INT8U keyDetected, keyPressed, keyTooLong, charTyed;
 
+
   (void)p_arg;	// to avoid a warning message
 
+	TASK_ENABLE1=0;
 
 //	Initialisations
 ///////////////////
@@ -666,7 +686,6 @@ static  void  ReadKbTask(void *p_arg)
 
 static  void  PwdCheckTask(void *p_arg)
 {
-	TASK_ENABLE4=1;
 	INT8U err;
 	INT8U *newChar;
 	int charCount;
@@ -766,6 +785,7 @@ static  void  DispKbTask(void *p_arg)
 
   (void)p_arg;	// to avoid a warning message
 
+	TASK_ENABLE1=0;
 
 //	Initialisations
 ///////////////////
