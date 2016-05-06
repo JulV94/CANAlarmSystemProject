@@ -11,16 +11,6 @@
 const INT8U hex2ASCII[16] = {	'0', '1', '2', '3', '4', '5', '6', '7',
 								'8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
 
-
-//////////////////////////////////////////////////////////////////////////////
-//																STRUCTURES																//
-//////////////////////////////////////////////////////////////////////////////
-
-typedef struct {
-	INT8U id;
-	INT8U msg;
-}CANMsg;
-
 //////////////////////////////////////////////////////////////////////////////
 //																VARIABLES																	//
 //////////////////////////////////////////////////////////////////////////////
@@ -64,21 +54,25 @@ OS_EVENT *HBMissmatchSM;
 
 // Mailboxes
 OS_EVENT *idListMB;
-OS_EVENT *idMB;
 OS_EVENT *statusMsgInMB;
 OS_EVENT *charTypedMB;
 OS_EVENT *KBMsgMB;
 OS_EVENT *charTypedMB;
-OS_EVENT *stateMB;
 OS_EVENT *validationResultMB;
 OS_EVENT *CANMsgOutMB;
 
 // Queues
 OS_EVENT *allCANMsgInQueue;
-CANMsg *allCANMsgInArray[30];
+INT8U *allCANMsgInArray[30];
 
 // Mutex
 OS_EVENT *netBufMutex;
+OS_EVENT *idMutex;
+OS_EVENT *stateMutex;
+
+// Global variables
+INT8U id;
+INT8U state;
 
 
 //////////////////////////////////////////////////////////////////////////////
@@ -118,12 +112,10 @@ CPU_INT16S  main (void)
 
 	// create mailbox
 	idListMB = OSMboxCreate((void *)0);
-	idMB = OSMboxCreate((void *)0);
 	statusMsgInMB = OSMboxCreate((void *)0);
 	charTypedMB = OSMboxCreate((void *)0);
 	KBMsgMB = OSMboxCreate((void *)0);
 	charTypedMB = OSMboxCreate((void *)0);
-	stateMB = OSMboxCreate((void *)0);
 	validationResultMB = OSMboxCreate((void *)0);
 	CANMsgOutMB = OSMboxCreate((void *)0);
 
@@ -131,7 +123,9 @@ CPU_INT16S  main (void)
 	allCANMsgInQueue = OSQCreate((void*)&allCANMsgInArray[0], 20);
 
 	// create Mutex
-	netBufMutex = OSMutexCreate(APP_TASK_START_PRIO, &err); // All task created can use the mutex
+	netBufMutex = OSMutexCreate(11, &err); // All task created can use the mutex
+	idMutex = OSMutexCreate(11, &err);
+	stateMutex = OSMutexCreate(11, &err);
 
 	OSTaskCreateExt(
 			AppStartTask,		// creates AppStartTask
@@ -326,7 +320,7 @@ static  void  AppStartTask (void *p_arg)
 
 //	Infinite loop
 /////////////////
-    while (42)
+    while (1)
 		{
 			OSTaskSuspend(OS_PRIO_SELF);
    	}
@@ -335,30 +329,27 @@ static  void  AppStartTask (void *p_arg)
 static  void  HeartbeatCheckTask(void *p_arg)
 {
 	INT8U err;
+	INT8U stateCpy;
 
   (void)p_arg;	// to avoid a warning message
-
-	INT8U *id;
-	INT8U *state;
 
 //	Initialisations
 ///////////////////
 	INT16U nodesTTL[256] = {0};
 	int fixedIdList[256];
-	CANMsg *msgInQueue;
+	INT8U *msgInQueue;
 	INT32U endTime=OSTimeGet();
 	INT32U time;
 	int i, j, sizeFixedList, size;
 	static INT8U HBMissmatchBuf;
 
-	id = (INT8U*)OSMboxPend(idMB, 0, &err);
+	TASK_ENABLE1=1;
 
 //	Infinite loop
 /////////////////
     while (42)
 		{
-			id = (INT8U*)OSMboxAccept(idMB);
-			time = (2e32-1)-abs(OSTimeGet()-endTime);
+			time = 4294967295-abs(OSTimeGet()-endTime);
 			for (i=0; i<256; i++)
 			{
 				nodesTTL[i]-=time;
@@ -369,14 +360,16 @@ static  void  HeartbeatCheckTask(void *p_arg)
 		}
 		endTime=OSTimeGet();
 		j=0;
-		while (msgInQueue = (CANMsg*)OSQPend(allCANMsgInQueue, 100, &err))
+		while (msgInQueue = (INT8U*)OSQPend(allCANMsgInQueue, 100, &err))
 		{
-			nodesTTL[msgInQueue[j].id]=5000;
+			nodesTTL[msgInQueue[j]]=5000;
 			j++;
 		}
-		if (state[0] == INIT_STATE || state[0] == DISARMED_STATE || state[0] == PWD_CHG_STATE)
+		OSMutexPend(stateMutex, 0, &err);
+		stateCpy=state;
+		OSMutexPost(stateMutex);
+		if (stateCpy == INIT_STATE || stateCpy == DISARMED_STATE || stateCpy == PWD_CHG_STATE)
 		{
-			id = (INT8U*)OSMboxAccept(idMB);  // for when takeID changes id when already taken
 			// update fixed list
 			Mem_Set((void*)&fixedIdList[0], -1, sizeof(int)*256);
 			for (i=0; i<256; i++)
@@ -397,17 +390,21 @@ static  void  HeartbeatCheckTask(void *p_arg)
 				size=0;
 				if (nodesTTL[i] > 0)
 				{
-					if (size > sizeFixedList || fixedIdList[size] != i || nodesTTL[i] == *id)
+					OSMutexPend(idMutex, 0, &err);
+					if (size > sizeFixedList || fixedIdList[size] != i || nodesTTL[i] == id)
 					{
+						TASK_ENABLE1=1;
 						err = OSSemPost(HBMissmatchSM);
 					}
+					OSMutexPost(idMutex);
 					size++;
 				}
 
 			}
 		}
 		err = OSMboxPost(idListMB, (void *)&fixedIdList[0]);
-		err = OSQFlush(allCANMsgInQueue);
+		//err = OSQFlush(allCANMsgInQueue);
+		TASK_ENABLE1^=1;
 		OSTimeDly(50);
    	}
 }
@@ -419,28 +416,27 @@ static  void  HeartbeatTask(void *p_arg)
 
 	(void)p_arg;	// to avoid a warning message
 
-	INT8U *id;
-	INT32U timeStart;
-	CANMsg heartbeat;
+	INT32U timeStart, magicNumber;
 //	Initialisations
 ///////////////////
-	id = (INT8U*)OSMboxPend(idMB, 0, &err);
-	heartbeat.id = *id;
-	heartbeat.msg = HEARTBEAT_MSG;
+	TASK_ENABLE2=1;
+	magicNumber = 4294967295;
 
 //	Infinite loop
 /////////////////
     while (1)
 		{
 			timeStart = OSTimeGet();
-			id = (INT8U*)OSMboxAccept(idMB);
-			OSMutextPend(netBufMutex, 0, &err);
+			OSMutexPend(netBufMutex, 4000, &err);
 			transmitBuffer.SID = HEARTBEAT_NET_PRIO;
 	    transmitBuffer.DLC = 1;
-			transmitBuffer.DATA[0] = *id;
+			OSMutexPend(idMutex, 0, &err);
+			transmitBuffer.DATA[0] = id;
+			OSMutexPost(idMutex);
 			CanSendMessage();
-			OSMutextPost(netBufMutex);
-			OSTimeDly(HEARTBEAT_PERIOD-(4294967295-abs(OSTimeGet()-timeStart))); // 2^32-1
+			OSMutexPost(netBufMutex);
+			TASK_ENABLE2^=1;
+			OSTimeDly(HEARTBEAT_PERIOD-(magicNumber-abs(OSTimeGet()-timeStart))); // 2^32-1
    	}
 }
 
@@ -448,7 +444,6 @@ static  void  TakeIdTask(void *p_arg)
 {
 	INT8U err;
 
-	INT8U *id;
 	int *idList;
 	int i;
 
@@ -457,22 +452,27 @@ static  void  TakeIdTask(void *p_arg)
 
 //	Initialisations
 ///////////////////
-	*id = rand()*256;
+	OSMutexPend(idMutex, 0, &err);
+	id = rand()%256;
+	OSMutexPost(idMutex);
+	TASK_ENABLE3=1;
 
 	do {
-		err = OSMboxPost(idMB, (void *)&id);
 		idList = (int*)OSMboxPend(idListMB, 0, &err);
 		i=0;
 		while (idList[i] != -1)
 		{
-			if (idList[i] == *id)
+			if (idList[i] == id)
 			{
-				*id = rand()*256;
+				OSMutexPend(idMutex, 0, &err);
+				id = rand()*256;
+				OSMutexPost(idMutex);
 				i=-1;
 			}
 			i++;
 		}
 	}while (idList == (int*)OSMboxPend(idListMB, 0, &err));
+	TASK_ENABLE3=0;
 
 //	Infinite loop
 /////////////////
@@ -482,17 +482,21 @@ static  void  TakeIdTask(void *p_arg)
    	}
 }
 
+int test;
+
 static  void  StateMachineTask(void *p_arg)
 {
 	INT8U err;
-	INT8U *id;
-  int state, networkState, previousState;
+  INT8U networkState, previousState;
 
   (void)p_arg;	// to avoid a warning message
 
 
 //	Initialisations
 ///////////////////
+	OSMutexPend(stateMutex,0, &err);
+	state = INIT_STATE;
+	OSMutexPost(stateMutex);
 	CanInitialisation(CAN_OP_MODE_NORMAL , CAN_BAUDRATE_500k);
 	CanLoadFilter(HEARTBEAT_FILTER, HEARTBEAT_NET_PRIO);
 	CanLoadFilter(INTRUSION_FILTER, INTRUSION_NET_PRIO);
@@ -509,27 +513,30 @@ static  void  StateMachineTask(void *p_arg)
 	CanAssociateMaskFilter(0, PWD_CHG_FILTER);
 	ACTIVATE_CAN_INTERRUPTS = 1;
 
-	state = INIT_STATE;
-	id = (INT8U*)OSMboxPend(idMB, 0, &err);
+	OSMutexPend(stateMutex, 0, &err);
   state = DISARMED_STATE;
+	OSMutexPost(stateMutex);
 
 //	Infinite loop
 /////////////////
   	while (1)
 		{
                 networkState = ((int*)OSMboxAccept(statusMsgInMB))[0];
+				OSMutexPend(stateMutex, 0, &err);
                 previousState = state;
-                if ((/*button pressed || */OSSemAccept(HBMissmatchSM)) && state < INTRUSION_STATE)
+				test = OSSemAccept(HBMissmatchSM);
+                if ((/*button pressed || */!test) && state < INTRUSION_STATE)
                 {
                     state = INTRUSION_STATE;
                 }
+				TASK_ENABLE1=0;
                 if (networkState > state)
                 {
                     state = networkState;
                 }
+				TASK_ENABLE1=0;
                 if (state != previousState)
                 {
-										OSMboxPost(stateMB, &state);
                     switch (state)
                     {
                     case INIT_STATE:
@@ -552,11 +559,14 @@ static  void  StateMachineTask(void *p_arg)
                         break;
                     }
                 }
+				TASK_ENABLE1=1;
                 if (state != networkState)
                 {
-									OSMutextPend(netBufMutex, 0, &err);
+									OSMutexPend(netBufMutex, 0, &err);
 									transmitBuffer.DLC = 1;
-									transmitBuffer.DATA[0] = *id;
+									OSMutexPend(idMutex, 0, &err);
+									transmitBuffer.DATA[0] = id;
+									OSMutexPost(idMutex);
 									switch (state)
 									{
 										case INIT_STATE:
@@ -583,9 +593,10 @@ static  void  StateMachineTask(void *p_arg)
 												CanSendMessage();
                         break;
                     }
-										OSMutextPost(netBufMutex);
+										OSMutexPost(netBufMutex);
 									}
-                }
+		OSMutexPost(stateMutex);
+		OSTimeDly(75);
    	}
 }
 
@@ -593,7 +604,7 @@ static  void  AlarmTask(void *p_arg)
 {
 	INT8U err;
 
-	INT8U *state;
+	INT8U stateCpy;
 
   (void)p_arg;	// to avoid a warning message
 
@@ -606,8 +617,10 @@ static  void  AlarmTask(void *p_arg)
 /////////////////
   	while (1)
 		{
-                state = (INT8U*)OSMboxPend(stateMB, 0, &err);
-								if (*state == ALARM_STATE)
+								OSMutexPend(stateMutex, 0, &err);
+								stateCpy=state;
+								OSMutexPost(stateMutex);
+								if (stateCpy == ALARM_STATE)
 								{
 									// launch the alarm code
 								}
@@ -653,10 +666,11 @@ static  void  ReadKbTask(void *p_arg)
 
 static  void  PwdCheckTask(void *p_arg)
 {
+	TASK_ENABLE4=1;
 	INT8U err;
-	INT8U *newChar
-	int charCount
-	INT8U currentPwd[4];
+	INT8U *newChar;
+	int charCount;
+	INT8U currentPwd[4] = {0};
 
 
   (void)p_arg;	// to avoid a warning message
@@ -665,7 +679,7 @@ static  void  PwdCheckTask(void *p_arg)
 //	Initialisations
 ///////////////////
 charCount=0;
-currentPwd={0};
+TASK_ENABLE4=0;
 
 //	Infinite loop
 /////////////////
@@ -680,17 +694,19 @@ currentPwd={0};
 			}
 			else
 			{
-				charCount=0;
 				if (currentPwd[0] == PASSWD0 && currentPwd[1] == PASSWD1 && currentPwd[2] == PASSWD2 && currentPwd[3] == PASSWD3) // password correct
 				{
-					OSMboxPost(validationResultMB, 0);
+					charCount=0;
+					OSMboxPost(validationResultMB, (void*)&charCount);
 					// add MB to state machine validation
 				}
 				else // wrong password
 				{
-					OSMboxPost(validationResultMB, -1);
+					charCount=-1;
+					OSMboxPost(validationResultMB, (void*)&charCount);
 					// add MB to state machine validation
 				}
+				charCount=0;
 			}
    	}
 }
@@ -698,8 +714,6 @@ currentPwd={0};
 static  void  DispStateTask(void *p_arg)
 {
 	INT8U err;
-
-	INT8U *state;
 
   (void)p_arg;	// to avoid a warning message
 
@@ -714,31 +728,33 @@ static  void  DispStateTask(void *p_arg)
 /////////////////
     while (1)
 		{
-                state = (INT8U*)OSMboxPend(stateMB, 0, &err);
                 DispClrScr();
-								switch (*state)
+				OSMutexPend(stateMutex, 0, &err);
+								switch (state)
 								{
 								case INIT_STATE:
-										DispStr(0, 0, "Initializing...");
+										DispStr(0, 0, (CPU_INT08U*)"Initializing...");
 										break;
 								case DISARMED_STATE:
-										DispStr(0, 0, "Disarmed");
+										DispStr(0, 0, (CPU_INT08U*)"Disarmed");
 										break;
 								case PWD_CHG_STATE:
-										DispStr(0, 0, "Insert a new");
-										DispStr(1, 0, "password");
+										DispStr(0, 0, (CPU_INT08U*)"Insert a new");
+										DispStr(1, 0, (CPU_INT08U*)"password");
 										break;
 								case ARMED_STATE:
-										DispStr(0, 0, "Armed");
+										DispStr(0, 0, (CPU_INT08U*)"Armed");
 										break;
 								case INTRUSION_STATE:
-										DispStr(0, 0, "Intrusion");
-										DispStr(1, 0, "detected !");
+										DispStr(0, 0, (CPU_INT08U*)"Intrusion");
+										DispStr(1, 0, (CPU_INT08U*)"detected !");
 										break;
 								case ALARM_STATE:
-										DispStr(0, 0, "Alarm ringing");
+										DispStr(0, 0, (CPU_INT08U*)"Alarm ringing");
 										break;
 								}
+				OSMutexPost(stateMutex);
+				OSTimeDly(STATE_DISP_REFRESH_PERIOD);
    	}
 }
 
@@ -765,19 +781,19 @@ static  void  DispKbTask(void *p_arg)
 								switch (*msg)
 								{
 								case -1:
-										DispStr(0, 0, "Wrong password");
+										DispStr(0, 0, (CPU_INT08U*)"Wrong password");
 										break;
 								case 0:
-										DispStr(0, 0, "Password OK");
+										DispStr(0, 0, (CPU_INT08U*)"Password OK");
 										break;
 								case 1:
-										DispStr(0, 0, "*");
+										DispStr(0, 0, (CPU_INT08U*)"*");
 										break;
 								case 2:
-										DispStr(0, 0, "**");
+										DispStr(0, 0, (CPU_INT08U*)"**");
 										break;
 								case 3:
-										DispStr(0, 0, "***");
+										DispStr(0, 0, (CPU_INT08U*)"***");
 										break;
 								}
    	}
@@ -800,6 +816,6 @@ static  void  DispChgPwdTask(void *p_arg)
 /////////////////
     while (1)
 		{
-
+		OSTaskSuspend(OS_PRIO_SELF);
    	}
 }

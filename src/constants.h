@@ -47,6 +47,7 @@
 // Periods
 #define HEARTBEAT_PERIOD                  4000
 #define READ_KB_PERIOD                    50
+#define STATE_DISP_REFRESH_PERIOD				  1000
 
 /////////////////////////////////////////////////////////////////////////////
 //                                 PROTOCOLS                               //
