@@ -128,12 +128,13 @@ CPU_INT16S  main (void)
 	stateMutex = OSMutexCreate(11, &err);
 
 	// enable interruptions button
-	IEC1bits.CNIE = 1;
-	CNEN1bits.CN15IE = 1;
-
-	R6 input
-	CN15 activate
-	activate change notification block interrupt
+	_CN15IE = 1;		//enable alarm switch
+	TRISAbits.TRISA3 = 0; //led
+	TRISAbits.TRISA2 = 0;
+	LATAbits.LATA2 = 1;
+	TRISDbits.TRISD6 = 1; //alarm switch interrupt
+	IFS1bits.CNIF = 0;
+	IEC1bits.CNIE = 1;            // Enable CN interrupts
 
 	OSTaskCreateExt(
 			AppStartTask,		// creates AppStartTask
@@ -539,7 +540,7 @@ static  void  StateMachineTask(void *p_arg)
                 networkState = ((int*)OSMboxAccept(statusMsgInMB))[0];
 				OSMutexPend(stateMutex, 0, &err);
                 previousState = state;
-				
+
                 if ((/*button pressed || */OSSemAccept(HBMissmatchSM)) && state < INTRUSION_STATE)
                 {
                     state = INTRUSION_STATE;

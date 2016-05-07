@@ -37,9 +37,3 @@ void __attribute__((interrupt, no_auto_psv))_C1Interrupt(void)
 		}
 		CAN_INTERRUPT_FLAG = 0;
 }
-
-void __attribute__((interrupt, no_auto_psv))_CNInterrupt(void)
-{
-	IFS0bits.CNIF = 0
-	
-}
