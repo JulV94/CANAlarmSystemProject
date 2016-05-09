@@ -21,6 +21,8 @@
 #define  DISP_STATE_PRIO                 	40
 #define  DISP_KB_PRIO                  		41
 #define  DISP_CHG_PWD_PRIO               	42
+#define  DAC_PRIO							21
+#define  SPEEX_PRIO							22
 
 /////////////////////////////////////////////////////////////////////////////
 //                            NETWORK PRIORITIES                           //
@@ -50,8 +52,8 @@
 #define STATE_DISP_REFRESH_PERIOD				  2000
 #define PWD_RESULT_DISP_TIME			  1500
 #define HEARTBEAT_CHECK_PERIOD			  500
-#define ALARM_PERIOD					  500
-#define INTRUSION_TMR_PERIOD			  30000
+#define ALARM_PERIOD					  1000
+#define INTRUSION_TMR_TIME				  5000
 
 /////////////////////////////////////////////////////////////////////////////
 //                                 PROTOCOLS                               //
@@ -77,5 +79,7 @@
 
 #define PWD_OK							  1
 #define PWD_WRONG						  2
+
+#define SOUND_BUF_SIZE					  64
 
 #endif

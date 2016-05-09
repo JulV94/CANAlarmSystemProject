@@ -33,7 +33,7 @@
 
 #define  LIB_STR_CFG_FP_EN                DEF_DISABLED
 #define  uC_PROBE_OS_PLUGIN               DEF_ENABLED
-#define  uC_PROBE_COM_MODULE              DEF_ENABLED
+#define  uC_PROBE_COM_MODULE              DEF_DISABLED
 
 
 

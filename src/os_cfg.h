@@ -31,7 +31,7 @@
 #define OS_ARG_CHK_EN             0    /* Enable (1) or Disable (0) argument checking                  */
 #define OS_CPU_HOOKS_EN           1    /* uC/OS-II hooks are found in the processor port files         */
 
-#define OS_DEBUG_EN               1    /* Enable(1) debug variables                                    */
+#define OS_DEBUG_EN               0    /* Enable(1) debug variables                                    */
 
 #define OS_EVENT_MULTI_EN         1    /* Include code for OSEventPendMulti()                          */
 #define OS_EVENT_NAME_SIZE       16    /* Determine the size of the name of a Sem, Mutex, Mbox or Q    */
@@ -66,7 +66,7 @@
 #define OS_TASK_NAME_SIZE        16    /*     Determine the size of a task name                        */
 #define OS_TASK_PROFILE_EN        1    /*     Include variables in OS_TCB for profiling                */
 #define OS_TASK_QUERY_EN          1    /*     Include code for OSTaskQuery()                           */
-#define OS_TASK_STAT_EN           1    /*     Enable (1) or Disable(0) the statistics task             */
+#define OS_TASK_STAT_EN           0    /*     Enable (1) or Disable(0) the statistics task             */
 #define OS_TASK_STAT_STK_CHK_EN   1    /*     Check task stacks from statistic task                    */
 #define OS_TASK_SUSPEND_EN        1    /*     Include code for OSTaskSuspend() and OSTaskResume()      */
 #define OS_TASK_SW_HOOK_EN        1    /*     Include code for OSTaskSwHook()                          */
@@ -138,6 +138,6 @@
 #define OS_TMR_CFG_MAX           16    /*     Maximum number of timers                                 */
 #define OS_TMR_CFG_NAME_SIZE     16    /*     Determine the size of a timer name                       */
 #define OS_TMR_CFG_WHEEL_SIZE     8    /*     Size of timer wheel (#Spokes)                            */
-#define OS_TMR_CFG_TICKS_PER_SEC 10    /*     Rate at which timer management task runs (Hz)            */
+#define OS_TMR_CFG_TICKS_PER_SEC 1000    /*     Rate at which timer management task runs (Hz)            */
 
 #endif
