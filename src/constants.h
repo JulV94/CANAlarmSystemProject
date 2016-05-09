@@ -1,10 +1,10 @@
 #ifndef CONSTANTS_H
 #define CONSTANTS_H
 
-#define PASSWD0                           1
-#define PASSWD1                           2
-#define PASSWD2                           3
-#define PASSWD3                           4
+#define PASSWD0                           '1'
+#define PASSWD1                           '2'
+#define PASSWD2                           '3'
+#define PASSWD3                           '4'
 
 /////////////////////////////////////////////////////////////////////////////
 //                              TASK PRIORITIES                            //
@@ -47,14 +47,16 @@
 // Periods
 #define HEARTBEAT_PERIOD                  4000
 #define READ_KB_PERIOD                    50
-#define STATE_DISP_REFRESH_PERIOD				  1000
+#define STATE_DISP_REFRESH_PERIOD				  2000
+#define PWD_RESULT_DISP_TIME			  1500
 #define HEARTBEAT_CHECK_PERIOD			  500
 #define ALARM_PERIOD					  500
+#define INTRUSION_TMR_PERIOD			  30000
 
 /////////////////////////////////////////////////////////////////////////////
 //                                 PROTOCOLS                               //
 /////////////////////////////////////////////////////////////////////////////
-#define INIT_STATE                        0
+#define INIT_STATE                        6
 #define DISARMED_STATE                    1
 #define PWD_CHG_STATE                     2
 #define ARMED_STATE                       3
@@ -68,5 +70,12 @@
 #define DISARMED_MSG                      3
 #define ALARM_MSG                         4
 #define PWD_CHG_MSG                       5
+
+// Nodes count
+
+#define MAX_NODES 10
+
+#define PWD_OK							  1
+#define PWD_WRONG						  2
 
 #endif

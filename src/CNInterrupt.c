@@ -1,14 +1,11 @@
 #include <includes.h>
 
-extern OS_EVENT *stateMutex;
-extern INT8U state;
+extern OS_EVENT* buttonPressedSM;
 
 void __attribute__((interrupt, no_auto_psv)) _CNInterrupt(void)
 {
     INT8U err;
     IFS1bits.CNIF = 0;
-    OSMutexPend(stateMutex, 0, &err);
-    state=ALARM_STATE;
-    OSMutexPost(stateMutex);
+	OSSemPost(buttonPressedSM);
     LATAbits.LATA3 = !LATAbits.LATA3; // led test
 }
