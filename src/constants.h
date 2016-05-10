@@ -51,7 +51,7 @@
 #define PWD_RESULT_DISP_TIME			  1500
 #define HEARTBEAT_CHECK_PERIOD			  500
 #define ALARM_PERIOD					  500
-#define INTRUSION_TMR_PERIOD			  30000
+#define INTRUSION_TMR_TIME				  30000
 
 /////////////////////////////////////////////////////////////////////////////
 //                                 PROTOCOLS                               //

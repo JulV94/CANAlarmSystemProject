@@ -52,14 +52,12 @@ OS_STK	DispChgPwdTaskStk[DISP_CHG_PWD_TASK_STK_SIZE];
 // Semaphores
 OS_EVENT *HBMissmatchSM;
 OS_EVENT *buttonPressedSM;
+OS_EVENT *intrusionTmrSM;
 
 // Mailboxes
 OS_EVENT *idListMB;
 OS_EVENT *charTypedMB;
-OS_EVENT *KBMsgMB;
-OS_EVENT *charTypedMB;
 OS_EVENT *validationResultMB;
-OS_EVENT *CANMsgOutMB;
 OS_EVENT *pwdValidityMB;
 
 // Queues
@@ -121,14 +119,12 @@ CPU_INT16S  main (void)
 	// create semaphores
 	HBMissmatchSM = OSSemCreate(0);
 	buttonPressedSM = OSSemCreate(0);
+	intrusionTmrSM = OSSemCreate(0);
 
 	// create mailbox
 	idListMB = OSMboxCreate((void *)0);
 	charTypedMB = OSMboxCreate((void *)0);
-	KBMsgMB = OSMboxCreate((void *)0);
-	charTypedMB = OSMboxCreate((void *)0);
 	validationResultMB = OSMboxCreate((void *)0);
-	CANMsgOutMB = OSMboxCreate((void *)0);
 	pwdValidityMB = OSMboxCreate((void *)0);
 
 	// create queues
@@ -340,9 +336,9 @@ static  void  AppStartTask (void *p_arg)
 		// defines the App Name (for debug purpose)
     OSTaskNameSet(DISP_KB_PRIO, (CPU_INT08U *)"Disp Kb Task", &err);
 
-	intrusionTmr = OSTmrCreate( INTRUSION_TMR_PERIOD, 
-									 0, 
-									 OS_TMR_OPT_ONE_SHOT, 
+	intrusionTmr = OSTmrCreate( 0,INTRUSION_TMR_TIME,  
+									 //0, 
+									 OS_TMR_OPT_PERIODIC, 
 									 IntrusionTmrFct, 
 									 (void *)0, 
 									 "Intrusion timer", 
@@ -551,7 +547,6 @@ static  void  StateMachineTask(void *p_arg)
   	while (1)
 		{
 				OSMutexPend(stateMutex, 0, &err);
-				previousState = state;
 				pushStateToNet = 0;
 				if (OSSemAccept(buttonPressedSM) && state == ARMED_STATE)
 				{
@@ -591,7 +586,7 @@ static  void  StateMachineTask(void *p_arg)
                     pushStateToNet = 1;
 					state = ALARM_STATE;
                 }
-				if (netState != state && !pushStateToNet)
+				if (netState != state && !pushStateToNet && !OSSemAccept(intrusionTmrSM))
                 {
                     state = netState;
                 }
@@ -655,6 +650,7 @@ static  void  StateMachineTask(void *p_arg)
 										OSMutexPost(netBufMutex);
 										CANSendState = state;
 									}
+		previousState = state;
 		OSMutexPost(netStateMutex);
 		OSMutexPost(stateMutex);
 		OSTimeDly(500);
@@ -786,6 +782,8 @@ static  void  DispStateTask(void *p_arg)
 	INT8U err;
 
   (void)p_arg;	// to avoid a warning message
+	
+	char idHexStr[3];
 
 
 //	Initialisations
@@ -825,6 +823,8 @@ static  void  DispStateTask(void *p_arg)
 										DispStr(0, 0, (CPU_INT08U*)"Alarm ringing");
 										break;
 								}
+					sprintf(&idHexStr[0], "%02X", id);
+					DispStr(1, 14, &idHexStr);
 				}
 				OSTimeDly(STATE_DISP_REFRESH_PERIOD-PWD_RESULT_DISP_TIME);
    	}
@@ -896,7 +896,9 @@ static void IntrusionTmrFct(void *p_tmr, void *p_arg)
 	INT8U err;
 	OSMutexPend(stateMutex, 0, &err);
 	state=ALARM_STATE;
+	err = OSSemPost(intrusionTmrSM);
 	OSMutexPost(stateMutex);
+	OSTmrStop(intrusionTmr, OS_TMR_OPT_NONE, (void *)0, &err);
 }
 
 static  int  sameArrays(int a[], int b[], int size)
