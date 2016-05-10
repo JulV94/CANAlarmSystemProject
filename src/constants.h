@@ -21,6 +21,8 @@
 #define  DISP_STATE_PRIO                 	40
 #define  DISP_KB_PRIO                  		41
 #define  DISP_CHG_PWD_PRIO               	42
+#define  DAC_PRIO							21
+#define  SPEEX_PRIO							22
 
 /////////////////////////////////////////////////////////////////////////////
 //                            NETWORK PRIORITIES                           //
@@ -77,5 +79,7 @@
 
 #define PWD_OK							  1
 #define PWD_WRONG						  2
+
+#define SOUND_BUF_SIZE					  64
 
 #endif

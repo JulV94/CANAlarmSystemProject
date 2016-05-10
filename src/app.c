@@ -49,10 +49,18 @@ OS_STK	DispKbTaskStk[DISP_KB_TASK_STK_SIZE];
 #define  DISP_CHG_PWD_TASK_STK_SIZE			128
 OS_STK	DispChgPwdTaskStk[DISP_CHG_PWD_TASK_STK_SIZE];
 
+#define  DAC_TASK_STK_SIZE					128
+OS_STK	DacTaskStk[DAC_TASK_STK_SIZE];
+
+#define  SPEEX_TASK_STK_SIZE				512
+OS_STK	SpeexTaskStk[SPEEX_TASK_STK_SIZE];
+
 // Semaphores
 OS_EVENT *HBMissmatchSM;
 OS_EVENT *buttonPressedSM;
 OS_EVENT *intrusionTmrSM;
+OS_EVENT *soundBuf0SM;
+OS_EVENT *soundBuf1SM;
 
 // Mailboxes
 OS_EVENT *idListMB;
@@ -68,7 +76,6 @@ INT8U *allCANMsgInArray[200];
 OS_EVENT *netBufMutex;
 OS_EVENT *idMutex;
 OS_EVENT *stateMutex;
-OS_EVENT *netStateMutex;
 
 // Timer
 OS_TMR *intrusionTmr;
@@ -76,11 +83,15 @@ OS_TMR *intrusionTmr;
 // Global variables
 INT8U id;
 INT8U state;
-INT8U netState;
 
 // Global without Mutex
 INT8U CANSendState;
 INT8U showPWD;
+INT8U playSound;
+
+// Buffers
+int	soundBuf0[SOUND_BUF_SIZE];
+int	soundBuf1[SOUND_BUF_SIZE];
 
 
 //////////////////////////////////////////////////////////////////////////////
@@ -97,6 +108,8 @@ static  void  PwdCheckTask(void *p_arg);
 static  void  DispStateTask(void *p_arg);
 static  void  DispKbTask(void *p_arg);
 static  void  DispChgPwdTask(void *p_arg);
+static  void  DacTask(void *p_arg);
+static  void  SpeexTask(void *p_arg);
 static  void  IntrusionTmrFct(void *p_tmr, void *p_arg);
 static  int   sameArrays(int a[], int b[], int size);
 
@@ -120,6 +133,8 @@ CPU_INT16S  main (void)
 	HBMissmatchSM = OSSemCreate(0);
 	buttonPressedSM = OSSemCreate(0);
 	intrusionTmrSM = OSSemCreate(0);
+	soundBuf0SM = OSSemCreate(0);
+	soundBuf1SM = OSSemCreate(0);
 
 	// create mailbox
 	idListMB = OSMboxCreate((void *)0);
@@ -134,7 +149,6 @@ CPU_INT16S  main (void)
 	netBufMutex = OSMutexCreate(11, &err); // All task created can use the mutex
 	idMutex = OSMutexCreate(11, &err);
 	stateMutex = OSMutexCreate(11, &err);
-	netStateMutex = OSMutexCreate(11, &err);
 
 	// enable interruptions button
 	_CN15IE = 1;		//enable alarm switch
@@ -336,6 +350,34 @@ static  void  AppStartTask (void *p_arg)
 		// defines the App Name (for debug purpose)
     OSTaskNameSet(DISP_KB_PRIO, (CPU_INT08U *)"Disp Kb Task", &err);
 
+		OSTaskCreateExt(
+			DacTask,
+			(void *)0,
+			(OS_STK *)&DacTaskStk[0],
+			DAC_PRIO,
+			DAC_PRIO,
+			(OS_STK *)&DacTaskStk[DAC_TASK_STK_SIZE-1],
+			DAC_TASK_STK_SIZE,
+			(void *)0,
+			OS_TASK_OPT_STK_CHK | OS_TASK_OPT_STK_CLR);
+
+		// defines the App Name (for debug purpose)
+    OSTaskNameSet(DAC_PRIO, (CPU_INT08U *)"Dac Decode Task", &err);
+
+		OSTaskCreateExt(
+			SpeexTask,
+			(void *)0,
+			(OS_STK *)&SpeexTaskStk[0],
+			SPEEX_PRIO,
+			SPEEX_PRIO,
+			(OS_STK *)&SpeexTaskStk[SPEEX_TASK_STK_SIZE-1],
+			SPEEX_TASK_STK_SIZE,
+			(void *)0,
+			OS_TASK_OPT_STK_CHK | OS_TASK_OPT_STK_CLR);
+
+		// defines the App Name (for debug purpose)
+    OSTaskNameSet(SPEEX_PRIO, (CPU_INT08U *)"Speex Task", &err);
+
 	intrusionTmr = OSTmrCreate( 0,INTRUSION_TMR_TIME,  
 									 //0, 
 									 OS_TMR_OPT_PERIODIC, 
@@ -516,7 +558,7 @@ static  void  TakeIdTask(void *p_arg)
 
 static  void  StateMachineTask(void *p_arg)
 {
-	INT8U err, previousState, wrongPwdCount, tmpState, pushStateToNet;
+	INT8U err, previousState, netState, wrongPwdCount, tmpState, pushStateToNet;
 	INT8U *pwdResult;
 
   (void)p_arg;	// to avoid a warning message
@@ -579,8 +621,7 @@ static  void  StateMachineTask(void *p_arg)
 					state = ALARM_STATE;
 					pushStateToNet = 1;
 				}
-				OSMutexPend(netStateMutex, 0, &err);
-				netState = CANSendState; // to avoid Mutex in the interruptions
+				netState = CANSendState; // to avoid Mutex and interruptions together
                 if (OSSemAccept(HBMissmatchSM) && (state == ARMED_STATE || state == INTRUSION_STATE))
                 {
                     pushStateToNet = 1;
@@ -651,7 +692,6 @@ static  void  StateMachineTask(void *p_arg)
 										CANSendState = state;
 									}
 		previousState = state;
-		OSMutexPost(netStateMutex);
 		OSMutexPost(stateMutex);
 		OSTimeDly(500);
    	}
@@ -668,7 +708,7 @@ static  void  AlarmTask(void *p_arg)
 
 //	Initialisations
 ///////////////////
-
+	playSound = 0;
 
 //	Infinite loop
 /////////////////
@@ -677,14 +717,7 @@ static  void  AlarmTask(void *p_arg)
 								OSMutexPend(stateMutex, 0, &err);
 								stateCpy=state;
 								OSMutexPost(stateMutex);
-								if (stateCpy == ALARM_STATE)
-								{
-									// launch the alarm code
-								}
-								else
-								{
-									// stop alarm code
-								}
+								playSound = (stateCpy == ALARM_STATE);
 								OSTimeDly(ALARM_PERIOD);
 
    	}
@@ -889,6 +922,73 @@ static  void  DispChgPwdTask(void *p_arg)
 		{
 		OSTaskSuspend(OS_PRIO_SELF);
    	}
+}
+
+static  void  DacTask(void *p_arg)
+{
+	int i,j;
+	int data;
+	INT8U err;
+	
+
+	// Initialisation du DAC
+	TRISBbits.TRISB2=0; //SPI
+	TRISFbits.TRISF6=0;
+	TRISFbits.TRISF8=0;
+	
+	OSSemPend(soundBuf0SM, 0, &err); /// pend from alarm task
+	while(1)
+	{
+		if (playSound)
+		{
+			for (i=0; i<SOUND_BUF_SIZE; i++)
+			{
+				sendToDac(soundBuf0[i]);
+				OSTimeDlyHMSM(0, 0, 0, 10);
+			}
+			OSSemPend(soundBuf0SM, 0, &err);
+			OSSemPost(soundBuf1SM);
+		
+			for (i=0; i<SOUND_BUF_SIZE; i++)
+			{
+				TASK_ENABLE1 = 0;
+				sendToDac(soundBuf1[i]);
+				TASK_ENABLE1 = 1;
+				OSTimeDlyHMSM(0, 0, 0, 10);
+			}
+			TASK_ENABLE1 = 1;
+			OSSemPend(soundBuf0SM, 0, &err);
+			OSSemPost(soundBuf1SM);
+		}
+	else
+		OSTimeDlyHMSM(0, 0, 0, 500);
+	}
+}
+
+static  void  SpeexTask(void *p_arg)
+{	 
+	INT8U err;
+	INT32U	clkValue;
+
+   (void)p_arg;			// to avoid a warning message
+
+
+//	Initialisations
+///////////////////
+	decodeSoundFrame(&soundBuf0[0], SOUND_BUF_SIZE);
+	OSSemPost(soundBuf0SM);
+
+//	Infinite loop
+/////////////////
+	while(1)
+	{
+		decodeSoundFrame(&soundBuf1[0], SOUND_BUF_SIZE);
+		OSSemPost(soundBuf0SM);
+		OSSemPend(soundBuf1SM, 0, &err);
+		decodeSoundFrame(&soundBuf0[0], SOUND_BUF_SIZE);
+		OSSemPost(soundBuf0SM);
+		OSSemPend(soundBuf1SM, 0, &err);
+	}
 }
 
 static void IntrusionTmrFct(void *p_tmr, void *p_arg)
